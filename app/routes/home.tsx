@@ -1,14 +1,13 @@
 import { useState } from "react";
 import type { Route } from "./+types/home";
-import defaultPlanData from "../../public/plan.json";
 import { hc } from "hono/client";
 import type { AppType } from "../../server";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
 import { Dropdown } from "~/common/dropdown";
 import { Dialog } from "~/common/dialog";
+import type { ResourceChange, TerraformPlanData } from "~/types/planData";
 
-type TPlanData = typeof defaultPlanData;
 const client = hc<AppType>("/api");
 
 export function meta({}: Route.MetaArgs) {
@@ -44,7 +43,7 @@ const ACTION_ICONS: Record<ChangeType, string> = {
   "no-op": "○",
 };
 
-type ResourceChange = (typeof defaultPlanData.resource_changes)[number];
+// type ResourceChange = (typeof defaultPlanData.resource_changes)[number];
 type JsonValue =
   | string
   | number
@@ -615,13 +614,13 @@ export default function Home() {
 
   const qc = useQueryClient();
 
-  const planDataQuery = useQuery<TPlanData>({
+  const planDataQuery = useQuery<TerraformPlanData>({
     queryKey: ["plan-data", project, workspace],
     queryFn: async () => {
       const res = await client.project[":project"][":workspace"].status.$get({
         param: { project, workspace },
       });
-      return (await res.json()) as TPlanData;
+      return (await res.json()) as TerraformPlanData;
     },
   });
 
