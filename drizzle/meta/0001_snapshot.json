@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3d9e31ea-4bea-4933-a9a7-e577616d6ee4",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "35237b47-4bbf-4633-b58c-88882b02a78a",
+  "prevId": "3d9e31ea-4bea-4933-a9a7-e577616d6ee4",
   "tables": {
     "params": {
       "name": "params",
@@ -263,7 +263,15 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "workspaces_name_projectName_pk": {
+          "columns": [
+            "name",
+            "projectName"
+          ],
+          "name": "workspaces_name_projectName_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     }

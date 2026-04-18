@@ -47,7 +47,7 @@ export function Dialog({
       />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 shadow-2xl flex flex-col">
+      <div className="relative z-10 w-full max-w-2xl rounded-xl border border-gray-700 bg-gray-900 shadow-2xl flex flex-col">
         {/* Header */}
         {title && (
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">

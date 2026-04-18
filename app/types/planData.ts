@@ -125,6 +125,7 @@ export interface TerraformPlanData {
   variables: Record<string, { value: unknown }>;
   planned_values: PlannedValues;
   resource_changes: ResourceChange[];
+  resource_drift?: ResourceChange[];
   output_changes: Record<string, OutputChange>;
   prior_state: PriorState;
   configuration: Configuration;

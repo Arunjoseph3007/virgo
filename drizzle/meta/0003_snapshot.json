@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3d9e31ea-4bea-4933-a9a7-e577616d6ee4",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "b59d3000-34db-48ff-b56f-03d939eb66d0",
+  "prevId": "a93a76b3-e4e2-4254-9845-c3897a3e3ccc",
   "tables": {
     "params": {
       "name": "params",
@@ -62,8 +62,8 @@
         }
       },
       "foreignKeys": {
-        "params_projectName_workspaceName_workspaces_projectName_projectName_fk": {
-          "name": "params_projectName_workspaceName_workspaces_projectName_projectName_fk",
+        "params_projectName_workspaceName_workspaces_projectName_name_fk": {
+          "name": "params_projectName_workspaceName_workspaces_projectName_name_fk",
           "tableFrom": "params",
           "tableTo": "workspaces",
           "columnsFrom": [
@@ -72,10 +72,10 @@
           ],
           "columnsTo": [
             "projectName",
-            "projectName"
+            "name"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -120,7 +120,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -259,11 +259,19 @@
           "columnsTo": [
             "name"
           ],
-          "onDelete": "no action",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "workspaces_name_projectName_pk": {
+          "columns": [
+            "name",
+            "projectName"
+          ],
+          "name": "workspaces_name_projectName_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     }

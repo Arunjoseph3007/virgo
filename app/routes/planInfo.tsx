@@ -1,16 +1,14 @@
 import { useState } from "react";
-import type { Route } from "./+types/home";
-import { hc } from "hono/client";
-import type { AppType } from "../../server";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { Dropdown } from "~/common/dropdown";
-import { Dialog } from "~/common/dialog";
 import type { ResourceChange, TerraformPlanData } from "~/types/planData";
+import { client } from "~/client";
+import { GitBranchIcon } from "~/common/icons";
+import { Dialog } from "~/common/dialog";
+import { ansiToHtml } from "~/utils/ansi";
 
-const client = hc<AppType>("/api");
-
-export function meta({}: Route.MetaArgs) {
+export function meta({}) {
   return [
     { title: "Terraform Plan Viewer" },
     { name: "description", content: "Terraform plan resource changes" },
@@ -280,7 +278,8 @@ function renderExprNode(val: JsonValue, level = 1): React.ReactNode {
 function renderDiffNode(
   before: JsonValue,
   after: JsonValue,
-  level = 0
+  level = 0,
+  afterUnknown: JsonValue = {} // TODO Implement afterUnknown
 ): React.ReactNode {
   const indent = "    ".repeat(level);
   const sindent = "    ".repeat(level - 1);
@@ -603,18 +602,54 @@ function ResourceCard({ change }: { change: ResourceChange }) {
   );
 }
 
-export default function Home() {
+
+function ErrorLogs({
+  project,
+  workspace,
+}: {
+  project: string;
+  workspace: string;
+}) {
+  const errLogsQuery = useQuery({
+    queryKey: ["error-logs", project, workspace],
+    queryFn: async () => {
+      const res = await client.project[":project"][":workspace"].error.$get({
+        param: { project, workspace },
+      });
+      return await res.json();
+    },
+  });
+
+  if (errLogsQuery.isLoading) return <p>Loading...</p>;
+
+  if (errLogsQuery.data && errLogsQuery.data.error == null)
+    return <p>Currently there are no errors</p>;
+
+  // Actual Term Escape Regex /(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]/g,
+  if (errLogsQuery.data)
+    return (
+      <div>
+        <pre
+          dangerouslySetInnerHTML={{
+            __html: ansiToHtml(errLogsQuery.data.error),
+          }}
+          className="rounded-lg bg-gray-950 text-gray-200 text-xs font-mono p-4 overflow-x-auto whitespace-pre"
+        />
+      </div>
+    );
+
+  return null;
+}
+
+export default function PlanInfoPage() {
   const param = useParams();
-  const navigate = useNavigate();
   const project = param.project!;
   const workspace = param.workspace!;
-
-  const [addWsMenuOpen, setAddWsMenuOpen] = useState(false);
-  const [newWsName, setNewWsName] = useState("");
+  const [showError, setShowError] = useState(false);
 
   const qc = useQueryClient();
 
-  const planDataQuery = useQuery<TerraformPlanData>({
+  const planDataQuery = useQuery({
     queryKey: ["plan-data", project, workspace],
     queryFn: async () => {
       const res = await client.project[":project"][":workspace"].status.$get({
@@ -624,14 +659,24 @@ export default function Home() {
     },
   });
 
-  const workspaceQuery = useQuery<string[]>({
+  const wsInfoQuery = useQuery({
+    queryKey: ["ws-data", project, workspace],
+    queryFn: async () => {
+      const res = await client.project[":project"][":workspace"].$get({
+        param: { project, workspace },
+      });
+      return await res.json();
+    },
+  });
+
+  const workspaceQuery = useQuery({
     initialData: [],
     queryKey: ["workspaces", project],
     queryFn: async () => {
       const res = await client.project[":project"].workspaces.$get({
         param: { project },
       });
-      return (await res.json()) as string[];
+      return await res.json();
     },
   });
 
@@ -645,6 +690,7 @@ export default function Home() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["plan-data"] });
+      qc.invalidateQueries({ queryKey: ["ws-data"] });
     },
   });
 
@@ -658,20 +704,6 @@ export default function Home() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["plan-data"] });
-    },
-  });
-
-  const addWsMur = useMutation({
-    mutationKey: ["add-workspace", project],
-    mutationFn: async (ws: string) => {
-      const res = await client.project[":project"].workspaces.$post({
-        json: { workspace: ws },
-        param: { project },
-      });
-      return await res.json();
-    },
-    onSuccess: (d) => {
-      navigate(`/project/${project}/${d.workspace}`);
     },
   });
 
@@ -696,74 +728,146 @@ export default function Home() {
     noOp: changes.filter((c) => c.change.actions.every((a) => a === "no-op"))
       .length,
   };
+  const drifts = planDataQuery.data?.resource_drift || [];
+  const driftDetected = drifts.length > 0;
+  const driftSummary = {
+    create: drifts.filter((c) => c.change.actions.includes("create")).length,
+    update: drifts.filter((c) => c.change.actions.includes("update")).length,
+    delete: drifts.filter((c) => c.change.actions.includes("delete")).length,
+    noOp: drifts.filter((c) => c.change.actions.every((a) => a === "no-op"))
+      .length,
+  };
+
+  const wsInfo = wsInfoQuery.data;
+
+  const HEALTH_STYLES: Record<string, string> = {
+    SYNC: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 border-green-200 dark:border-green-800",
+    OUT_OF_SYNC:
+      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800",
+    ERROR:
+      "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 border-red-200 dark:border-red-800",
+    PROGRESSING:
+      "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+  };
+  const HEALTH_DOTS: Record<string, string> = {
+    SYNC: "bg-green-500",
+    OUT_OF_SYNC: "bg-yellow-500",
+    ERROR: "bg-red-500",
+    PROGRESSING: "bg-blue-500 animate-pulse",
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 px-4 py-10">
       <div className="mx-auto max-w-4xl">
         {/* Header */}
-        <div className="flex justify-between items-center gap-2">
-          <div className="mb-8 flex-1">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-              Terraform Plan
-            </h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              v{planDataQuery.data.terraform_version} &middot; {changes.length}{" "}
-              resources
-            </p>
-          </div>
-          <Dropdown title={workspace}>
-            {workspaceQuery.data.map((ws) => (
-              <div
-                className="hover:bg-gray-700 py-1 px-2 cursor-pointer"
-                key={ws}
+        <div className="mb-8 py-5">
+          {/* Top row: breadcrumb + actions */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              {/* Breadcrumb */}
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-mono mb-1 tracking-wide">
+                <Link
+                  to="/projects"
+                  className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  {project}
+                </Link>
+                <span className="mx-1.5">/</span>
+                <span className="text-gray-600 dark:text-gray-300">
+                  {workspace}
+                </span>
+              </p>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                Terraform Plan
+              </h1>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex shrink-0 items-center gap-2">
+              <Dropdown title={workspace}>
+                {workspaceQuery.data.map((ws) => (
+                  <div
+                    className="hover:bg-gray-700 py-1 px-2 cursor-pointer"
+                    key={ws.name}
+                  >
+                    <Link to={`/projects/${project}/${ws.name}`}>
+                      {ws.name}
+                    </Link>
+                  </div>
+                ))}
+                <Link
+                  className="hover:bg-gray-700 py-1 px-2 cursor-pointer"
+                  to={`/projects/${project}/new-ws`}
+                >
+                  + Add
+                </Link>
+              </Dropdown>
+              <button
+                className="cursor-pointer border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
+                onClick={() => refreshMut.mutate()}
+                disabled={refreshMut.isPending}
               >
-                <Link to={`/project/${project}/${ws}`}>{ws}</Link>
-              </div>
-            ))}
-            <button
-              onClick={() => setAddWsMenuOpen(true)}
-              className="hover:bg-gray-700 py-1 px-2 cursor-pointer"
-            >
-              + Add
-            </button>
-            <Dialog
-              open={addWsMenuOpen}
-              onClose={() => setAddWsMenuOpen(false)}
-              title="Add Workspace"
-              actions={[
-                { label: "Cancel", onClick: () => setAddWsMenuOpen(false) },
-                {
-                  label: "Add",
-                  variant: "primary",
-                  onClick: () => addWsMur.mutate(newWsName),
-                },
-              ]}
-            >
-              <p>Workspace name</p>
-              <input
-                type="text"
-                onChange={(e) => setNewWsName(e.target.value)}
-                className="border border-gray-700 rounded-lg px-4 py-2 mt-2"
-                placeholder="eg. dev"
-              />
-            </Dialog>
-          </Dropdown>
+                {refreshMut.isPending ? "Refreshing…" : "Refresh"}
+              </button>
+              <button
+                className="cursor-pointer border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-green-100 dark:hover:bg-green-900 transition-colors"
+                onClick={() => applyMut.mutate()}
+                disabled={applyMut.isPending}
+              >
+                {applyMut.isPending ? "Applying…" : "Apply"}
+              </button>
+            </div>
+          </div>
 
-          <button
-            className="cursor-pointer border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-lg disabled:opacity-50"
-            onClick={() => refreshMut.mutate()}
-            disabled={refreshMut.isPending}
-          >
-            Refresh
-          </button>
+          {/* Meta row: health + git target + tf version + resource count */}
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+            {wsInfo?.health && (
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-0.5 text-xs font-semibold ${HEALTH_STYLES[wsInfo.health] ?? HEALTH_STYLES["OUT_OF_SYNC"]}`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${HEALTH_DOTS[wsInfo.health] ?? "bg-gray-400"}`}
+                />
+                {wsInfo.health.replace("_", " ")}
+              </span>
+            )}
 
-          <button
-            className="cursor-pointer border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 px-4 py-2 rounded-lg disabled:opacity-50"
-            onClick={() => applyMut.mutate()}
-            disabled={applyMut.isPending}
-          >
-            Apply
-          </button>
+            {wsInfo?.health == "ERROR" && (
+              <>
+                <button onClick={() => setShowError(true)}>Logs</button>
+                <Dialog
+                  title={`Error logs - ${project}`}
+                  open={showError}
+                  onClose={() => setShowError(false)}
+                  actions={[
+                    {
+                      label: "Close",
+                      onClick() {
+                        setShowError(false);
+                      },
+                      variant: "primary",
+                    },
+                  ]}
+                >
+                  <ErrorLogs project={project} workspace={workspace} />
+                </Dialog>
+              </>
+            )}
+
+            {wsInfo?.gitTarget && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 px-3 py-0.5 text-xs font-mono text-gray-600 dark:text-gray-300">
+                <GitBranchIcon />
+                {wsInfo.gitTarget}
+              </span>
+            )}
+            <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+              tf v{planDataQuery.data.terraform_version}
+            </span>
+            <span className="text-gray-300 dark:text-gray-700">&middot;</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              {changes.length} resources
+            </span>
+          </div>
         </div>
 
         {/* Summary bar */}
@@ -814,6 +918,71 @@ export default function Home() {
         <div className="space-y-3">
           {changes.map((change) => (
             <ResourceCard key={change.address} change={change} />
+          ))}
+        </div>
+
+        <hr className="my-4 border-gray-700" />
+
+        {driftDetected ? (
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
+              Drift Detected
+            </h2>
+
+            {/* Drift Summary Bar */}
+            <div className="mb-6 flex flex-wrap gap-3">
+              {driftSummary.create > 0 && (
+                <div className="flex items-center gap-2 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 px-4 py-2">
+                  <span className="text-lg font-bold text-green-700 dark:text-green-300">
+                    {driftSummary.create}
+                  </span>
+                  <span className="text-sm text-green-700 dark:text-green-300">
+                    to create
+                  </span>
+                </div>
+              )}
+              {driftSummary.update > 0 && (
+                <div className="flex items-center gap-2 rounded-lg bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 px-4 py-2">
+                  <span className="text-lg font-bold text-yellow-700 dark:text-yellow-300">
+                    {driftSummary.update}
+                  </span>
+                  <span className="text-sm text-yellow-700 dark:text-yellow-300">
+                    to update
+                  </span>
+                </div>
+              )}
+              {driftSummary.delete > 0 && (
+                <div className="flex items-center gap-2 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-2">
+                  <span className="text-lg font-bold text-red-700 dark:text-red-300">
+                    {driftSummary.delete}
+                  </span>
+                  <span className="text-sm text-red-700 dark:text-red-300">
+                    to destroy
+                  </span>
+                </div>
+              )}
+              {driftSummary.noOp > 0 && (
+                <div className="flex items-center gap-2 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2">
+                  <span className="text-lg font-bold text-gray-600 dark:text-gray-300">
+                    {driftSummary.noOp}
+                  </span>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    unchanged
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
+            No Drift Detected
+          </h2>
+        )}
+
+        {/* Drift cards */}
+        <div className="space-y-3">
+          {drifts.map((drift) => (
+            <ResourceCard key={drift.address} change={drift} />
           ))}
         </div>
       </div>
