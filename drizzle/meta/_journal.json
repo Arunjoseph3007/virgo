@@ -29,6 +29,13 @@
       "when": 1776430070365,
       "tag": "0003_lethal_mariko_yashida",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1776519601355,
+      "tag": "0004_known_steel_serpent",
+      "breakpoints": true
     }
   ]
 }

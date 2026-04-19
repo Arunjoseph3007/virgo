@@ -19,7 +19,8 @@ export const repos = sqliteTable("repos", {
   id: int().primaryKey({ autoIncrement: true }),
   name: text().notNull(),
   url: text().notNull(),
-});
+  connected: int({ mode: "number" }).default(0),
+}); 
 
 export const projects = sqliteTable("projects", {
   name: text({ length: 20 }).primaryKey(),
@@ -103,5 +104,5 @@ export type TProject = InferSelectModel<typeof projects>;
 export type TRepo = InferSelectModel<typeof repos>;
 export type TWorkspace = InferSelectModel<typeof workspaces>;
 export type TParam = InferSelectModel<typeof params>;
-export type TParamType = typeof PARAM_TYPES[number]
-export type TWSHealthStatus = typeof WS_STATES[number]
+export type TParamType = (typeof PARAM_TYPES)[number];
+export type TWSHealthStatus = (typeof WS_STATES)[number];

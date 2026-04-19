@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router";
 import { Dropdown } from "~/common/dropdown";
 import type { ResourceChange, TerraformPlanData } from "~/types/planData";
 import { client } from "~/client";
-import { GitBranchIcon } from "~/common/icons";
+import { CresentIcon, GitBranchIcon } from "~/common/icons";
 import { Dialog } from "~/common/dialog";
 import { ansiToHtml } from "~/utils/ansi";
 
@@ -602,38 +602,37 @@ function ResourceCard({ change }: { change: ResourceChange }) {
   );
 }
 
-
-function ErrorLogs({
+function PlanLogs({
   project,
   workspace,
 }: {
   project: string;
   workspace: string;
 }) {
-  const errLogsQuery = useQuery({
-    queryKey: ["error-logs", project, workspace],
+  const logsQuery = useQuery({
+    queryKey: ["plan-logs", project, workspace],
     queryFn: async () => {
-      const res = await client.project[":project"][":workspace"].error.$get({
+      const res = await client.project[":project"][":workspace"].logs.$get({
         param: { project, workspace },
       });
       return await res.json();
     },
   });
 
-  if (errLogsQuery.isLoading) return <p>Loading...</p>;
+  if (logsQuery.isLoading) return <p>Loading...</p>;
 
-  if (errLogsQuery.data && errLogsQuery.data.error == null)
+  if (logsQuery.data && logsQuery.data.logs == null)
     return <p>Currently there are no errors</p>;
 
   // Actual Term Escape Regex /(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]/g,
-  if (errLogsQuery.data)
+  if (logsQuery.data)
     return (
       <div>
         <pre
           dangerouslySetInnerHTML={{
-            __html: ansiToHtml(errLogsQuery.data.error),
+            __html: ansiToHtml(logsQuery.data.logs),
           }}
-          className="rounded-lg bg-gray-950 text-gray-200 text-xs font-mono p-4 overflow-x-auto whitespace-pre"
+          className="rounded-lg bg-gray-950 text-gray-200 text-xs font-mono p-4 overflow-x-auto whitespace-pre max-h-[60vh]"
         />
       </div>
     );
@@ -645,7 +644,7 @@ export default function PlanInfoPage() {
   const param = useParams();
   const project = param.project!;
   const workspace = param.workspace!;
-  const [showError, setShowError] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
 
   const qc = useQueryClient();
 
@@ -691,6 +690,9 @@ export default function PlanInfoPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["plan-data"] });
       qc.invalidateQueries({ queryKey: ["ws-data"] });
+    },
+    onError: () => {
+      setShowLogs(true);
     },
   });
 
@@ -786,21 +788,22 @@ export default function PlanInfoPage() {
             <div className="flex shrink-0 items-center gap-2">
               <Dropdown title={workspace}>
                 {workspaceQuery.data.map((ws) => (
-                  <div
-                    className="hover:bg-gray-700 py-1 px-2 cursor-pointer"
+                  <Link
                     key={ws.name}
+                    to={`/projects/${project}/${ws.name}`}
+                    className={`block px-3 py-2 text-sm transition-colors ${ws.name === workspace ? "text-blue-600 dark:text-blue-400 font-medium bg-blue-50 dark:bg-blue-950" : "text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
                   >
-                    <Link to={`/projects/${project}/${ws.name}`}>
-                      {ws.name}
-                    </Link>
-                  </div>
+                    {ws.name}
+                  </Link>
                 ))}
-                <Link
-                  className="hover:bg-gray-700 py-1 px-2 cursor-pointer"
-                  to={`/projects/${project}/new-ws`}
-                >
-                  + Add
-                </Link>
+                <div className="border-t border-gray-100 dark:border-gray-700">
+                  <Link
+                    to={`/projects/${project}/new-ws`}
+                    className="block px-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    + New workspace
+                  </Link>
+                </div>
               </Dropdown>
               <button
                 className="cursor-pointer border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
@@ -832,27 +835,29 @@ export default function PlanInfoPage() {
               </span>
             )}
 
-            {wsInfo?.health == "ERROR" && (
-              <>
-                <button onClick={() => setShowError(true)}>Logs</button>
-                <Dialog
-                  title={`Error logs - ${project}`}
-                  open={showError}
-                  onClose={() => setShowError(false)}
-                  actions={[
-                    {
-                      label: "Close",
-                      onClick() {
-                        setShowError(false);
-                      },
-                      variant: "primary",
-                    },
-                  ]}
-                >
-                  <ErrorLogs project={project} workspace={workspace} />
-                </Dialog>
-              </>
-            )}
+            <button
+              onClick={() => setShowLogs(true)}
+              className="inline-flex items-center gap-1 rounded-full border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 px-3 py-0.5 text-xs font-semibold text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900 transition-colors cursor-pointer"
+            >
+              <CresentIcon />
+              View logs
+            </button>
+            <Dialog
+              title={`Plan logs — ${project} / ${workspace}`}
+              open={showLogs}
+              onClose={() => setShowLogs(false)}
+              actions={[
+                {
+                  label: "Close",
+                  onClick() {
+                    setShowLogs(false);
+                  },
+                  variant: "primary",
+                },
+              ]}
+            >
+              <PlanLogs project={project} workspace={workspace} />
+            </Dialog>
 
             {wsInfo?.gitTarget && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 px-3 py-0.5 text-xs font-mono text-gray-600 dark:text-gray-300">

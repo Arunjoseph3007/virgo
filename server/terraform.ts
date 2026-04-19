@@ -9,11 +9,11 @@ import {
   projects,
   workspaces,
   type TParam,
-  type TParamType,
   type TProject,
   type TWorkspace,
   type TWSHealthStatus,
 } from "./db/schema";
+import { unreachable } from "./utils";
 
 const REPO_ROOT: string = process.env.REPO_ROOT!;
 const CACHE_ROOT: string = process.env.CACHE_ROOT!;
@@ -78,13 +78,16 @@ export class Terraform {
     this.__initDone = true;
   }
 
-  private exec(cmd: string, { throwOnError = true } = {}): Promise<ExecOut> {
+  private exec(
+    cmd: string,
+    { throwOnError = true, timeout = 100 * 1000 } = {}
+  ): Promise<ExecOut> {
     console.log("\x1b[32mEXEC_CMD\x1b[0m:", cmd);
 
     return new Promise((resolve, reject) => {
       child_process.exec(
         cmd,
-        { cwd: this.repoPath },
+        { cwd: this.repoPath, timeout },
         (error, stdout, stderr) => {
           if (error) {
             if (throwOnError) {
@@ -127,8 +130,8 @@ export class Terraform {
     return path.join(this.cachePath, `${this.workspace}-plan.json`);
   }
 
-  private get planErrorFile() {
-    return path.join(this.cachePath, `${this.workspace}-plan-error.json`);
+  private get planLogsFile() {
+    return path.join(this.cachePath, `${this.workspace}-plan-logs.json`);
   }
 
   private obscureSensitive(planData: TerraformPlanData): TerraformPlanData {
@@ -216,17 +219,19 @@ export class Terraform {
     }
 
     const planRes = await this.exec(
-      `terraform plan -detailed-exitcode ${this.getParamFlags()} -out ${this.planCacheFile}`,
+      `terraform plan -detailed-exitcode ${this.getParamFlags()} -input=false -out ${this.planCacheFile}`,
       { throwOnError: false }
     );
 
     if (planRes.exitCode == 0) {
+      fs.writeFileSync(this.planLogsFile, planRes.stdout);
       await this.setHealthStatus("SYNC");
     } else if (planRes.exitCode == 1) {
-      fs.writeFileSync(this.planErrorFile, planRes.stderr);
+      fs.writeFileSync(this.planLogsFile, planRes.stderr);
       await this.setHealthStatus("ERROR");
       return false;
     } else if (planRes.exitCode == 2) {
+      fs.writeFileSync(this.planLogsFile, planRes.stdout);
       await this.setHealthStatus("OUT_OF_SYNC");
     } else {
       unreachable(
@@ -264,7 +269,7 @@ export class Terraform {
     return true;
   }
 
-  async getPlanErr() {
+  async getPlanLogs() {
     if (!this.workspace) this.throwNoInitErr();
 
     const r = await db.query.workspaces.findFirst({
@@ -277,10 +282,9 @@ export class Terraform {
       },
     });
     if (!r) this.throwNoInitErr();
+    if (!fs.existsSync(this.planLogsFile)) return null;
 
-    if (r.health != "ERROR") return null;
-
-    return fs.readFileSync(this.planErrorFile).toString();
+    return fs.readFileSync(this.planLogsFile).toString();
   }
 
   async listWS() {

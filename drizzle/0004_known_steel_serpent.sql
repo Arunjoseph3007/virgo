@@ -1,0 +1,1 @@
+ALTER TABLE `repos` ADD `connected` integer DEFAULT 0;

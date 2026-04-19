@@ -8,10 +8,53 @@ import { zValidator } from "@hono/zod-validator";
 import { serve } from "@hono/node-server";
 import { Terraform } from "./terraform";
 import { db } from "./db";
-import { PARAM_TYPES } from "./db/schema";
+import { PARAM_TYPES, repos } from "./db/schema";
+import { Repo } from "./repo";
+import { eq } from "drizzle-orm";
 
 const routes = new Hono()
   .get("/health", (c) => c.json({ status: "OK" }))
+
+  .post(
+    "/repos",
+    zValidator(
+      "json",
+      z.object({
+        name: z.string(),
+        url: z.url(),
+      })
+    ),
+    async (c) => {
+      const values = c.req.valid("json");
+      const res = await db.insert(repos).values(values).returning();
+
+      const repo = await Repo.init(res[0].id);
+      const connected = await repo.tryClone();
+
+      return c.json({ ...res, connected });
+    }
+  )
+  .get("/repos", async (c) => {
+    const repos = await db.query.repos.findMany({ limit: 20 });
+
+    return c.json(repos);
+  })
+  .post("/repos/:repoId/retry", async (c) => {
+    const repoId = c.req.param("repoId");
+
+    const repo = await Repo.init(parseInt(repoId));
+    const connected = await repo.tryClone();
+
+    return c.json(connected);
+  })
+  .delete("/repos/:repoId", async (c) => {
+    const repoId = parseInt(c.req.param("repoId"));
+
+    const repo = await Repo.init(repoId)
+    await repo.deleteAndCleanup()
+    
+    return c.json({ success: true });
+  })
 
   .get("/project", async (c) => {
     const projs = await db.query.projects.findMany({
@@ -20,7 +63,6 @@ const routes = new Hono()
     });
     return c.json(projs);
   })
-
   .post(
     "/project/:project/workspaces",
     zValidator(
@@ -62,14 +104,14 @@ const routes = new Hono()
     const tf = await Terraform.init(project, workspace);
     return c.json(tf.workspaceInfo);
   })
-  .get("/project/:project/:workspace/error", async (c) => {
+  .get("/project/:project/:workspace/logs", async (c) => {
     const { project, workspace } = c.req.param();
 
     const tf = await Terraform.init(project, workspace);
-    const err = await tf.getPlanErr();
+    const logs = await tf.getPlanLogs();
 
-    if (!err) return c.json({ error: null });
-    return c.json({ error: err });
+    if (!logs) return c.json({ logs: null });
+    return c.json({ logs });
   })
   .get("/project/:project/:workspace/refresh", async (c) => {
     const { project, workspace } = c.req.param();
@@ -80,7 +122,6 @@ const routes = new Hono()
     if (!res) return c.notFound();
     return c.json({ success: true });
   })
-
   .get("/project/:project/:workspace/apply", async (c) => {
     const { project, workspace } = c.req.param();
 
@@ -90,7 +131,6 @@ const routes = new Hono()
     if (!res) return c.notFound();
     return c.json({ success: true });
   })
-
   .get("/project/:project/:workspace/status", async (c) => {
     const { project, workspace } = c.req.param();
 

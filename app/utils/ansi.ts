@@ -32,6 +32,12 @@ function escapeHtml(s: string) {
  * Full ANSI-to-HTML converter.
  * Handles compound codes (e.g. ESC[1;31m), all 8+8 fg colors, common styles,
  * and proper reset (closes all open spans on ESC[0m).
+ * 
+ * Assumes that user is working with Tailwind CSS
+ * 
+ * @str terminal output
+ * 
+ * @returns html string
  */
 export function ansiToHtml(str: string): string {
   const re = /\u001b\[([\d;]*)m/g;
