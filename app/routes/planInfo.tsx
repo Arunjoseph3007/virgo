@@ -279,7 +279,7 @@ function renderDiffNode(
   before: JsonValue,
   after: JsonValue,
   level = 0,
-  afterUnknown: JsonValue = {} // TODO Implement afterUnknown
+  afterUnknown: any
 ): React.ReactNode {
   const indent = "    ".repeat(level);
   const sindent = "    ".repeat(level - 1);
@@ -301,7 +301,11 @@ function renderDiffNode(
           <ColorVal val={before} />
         </span>
         <span className={HIGHLIGHT.diffArrow}> → </span>
-        <ColorVal val={after} />
+        {afterUnknown ? (
+          <span className={HIGHLIGHT.null}># known after apply</span>
+        ) : (
+          <ColorVal val={after} />
+        )}
       </>
     );
   }
@@ -311,6 +315,7 @@ function renderDiffNode(
     const bArr = (before || []) as JsonValue[];
     const aArr = (after || []) as JsonValue[];
     const max = Math.max(bArr.length, aArr.length);
+
     if (max === 0) return <span className={HIGHLIGHT.punctuation}>{"[]"}</span>;
     return (
       <>
@@ -321,7 +326,12 @@ function renderDiffNode(
             <span key={i}>
               {indent}
               <DiffSym sym={sym} />{" "}
-              {renderDiffNode(bArr[i] ?? null, aArr[i] ?? null, level + 1)}
+              {renderDiffNode(
+                bArr[i] ?? null,
+                aArr[i] ?? null,
+                level + 1,
+                afterUnknown[i]
+              )}
               {",\n"}
             </span>
           );
@@ -351,6 +361,7 @@ function renderDiffNode(
         {[...keysSet].map((key) => {
           const bVal = bObj[key] ?? null;
           const aVal = aObj[key] ?? null;
+          const afterUnknownVal = afterUnknown[key] ?? null;
 
           // array blocks
           if (
@@ -369,7 +380,12 @@ function renderDiffNode(
                   {indent}
                   <DiffSym sym={sym} />{" "}
                   <span className={HIGHLIGHT.key}>{key}</span>{" "}
-                  {renderDiffNode(bVal[i] ?? null, aVal[i] ?? null, level + 1)}
+                  {renderDiffNode(
+                    bVal[i] ?? null,
+                    aVal[i] ?? null,
+                    level + 1,
+                    afterUnknownVal[i]
+                  )}
                   {"\n"}
                 </span>
               );
@@ -383,7 +399,7 @@ function renderDiffNode(
                 {indent}
                 <DiffSym sym={sym} />{" "}
                 <span className={HIGHLIGHT.key}>{key}</span>{" "}
-                {renderDiffNode(bVal, aVal, level + 1)}
+                {renderDiffNode(bVal, aVal, level + 1, afterUnknownVal)}
                 {"\n"}
               </span>
             );
@@ -397,7 +413,7 @@ function renderDiffNode(
                 <DiffSym sym={sym} />{" "}
                 <span className={HIGHLIGHT.key}>{key}</span>
                 {" = "}
-                {renderDiffNode(bVal, aVal, level + 1)}
+                {renderDiffNode(bVal, aVal, level + 1, afterUnknownVal)}
                 {"\n"}
               </span>
             );
@@ -513,22 +529,24 @@ function DiffView({
   type,
   before,
   after,
-  change,
+  changeType,
+  afterUnknown,
 }: {
   name: string;
   type: string;
   before: JsonValue;
   after: JsonValue;
-  change: ChangeType;
+  changeType: ChangeType;
+  afterUnknown: any;
 }) {
   return (
     <pre className="rounded-lg bg-gray-950 text-gray-200 text-xs font-mono p-4 overflow-x-auto whitespace-pre leading-relaxed">
       {"  "}
-      <DiffSym sym={ACTION_ICONS[change]} />
+      <DiffSym sym={ACTION_ICONS[changeType]} />
       {" resource "}
       <span className={HIGHLIGHT.string}>"{name}"</span>{" "}
       <span className={HIGHLIGHT.string}>"{type}"</span>{" "}
-      {renderDiffNode(before, after, 2)}
+      {renderDiffNode(before, after, 2, afterUnknown)}
     </pre>
   );
 }
@@ -581,13 +599,30 @@ function ResourceCard({ change }: { change: ResourceChange }) {
       {/* Accordion body */}
       {open && (
         <div className="px-5 pb-5 border-t border-gray-100 dark:border-gray-800 pt-4">
+          {change.change.replace_paths && (
+            <div>
+              <p className="text-sm text-gray-900 dark:text-gray-200">
+                Replacement caused by change in following places
+              </p>
+              <ul className="list-disc pl-5">
+                {change.change.replace_paths.map((path) => (
+                  <li className="my-2">
+                    <span className="rounded-lg bg-gray-950 text-gray-200 text-xs font-mono py-1 px-2 my-1 leading-relaxed">
+                      {path.join(".")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {changed ? (
             <DiffView
               name={change.name}
               type={change.type}
               before={change.change.before as any}
               after={change.change.after as any}
-              change={change.change.actions[0] as ChangeType}
+              changeType={change.change.actions[0] as ChangeType}
+              afterUnknown={change.change.after_unknown}
             />
           ) : (
             <ResourceInfo
