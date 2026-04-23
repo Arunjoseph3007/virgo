@@ -14,6 +14,7 @@ import {
   type TWSHealthStatus,
 } from "./db/schema";
 import { unreachable } from "./utils";
+import z from "zod";
 
 const REPO_ROOT: string = process.env.REPO_ROOT!;
 const CACHE_ROOT: string = process.env.CACHE_ROOT!;
@@ -24,6 +25,23 @@ type ExecOut = {
   stdout: string;
   stderr: string;
 };
+
+const isPrimitive = (v: any) =>
+  typeof v == "string" || typeof v == "number" || typeof v == "boolean";
+function obscureSensitive(
+  before: any,
+  after: any,
+  beforeSensitive: any,
+  afterSensitive: any
+) {
+  return;
+}
+
+export const applyConfigSchema = z.object({
+  target: z.array(z.string()).optional(),
+});
+
+export type TApplyConfig = z.infer<typeof applyConfigSchema>;
 
 export class Terraform {
   project: string;
@@ -135,7 +153,14 @@ export class Terraform {
   }
 
   private obscureSensitive(planData: TerraformPlanData): TerraformPlanData {
-    // todo
+    planData.resource_changes.forEach((ch) => {
+      const { before, after, before_sensitive, after_sensitive } = ch.change;
+      obscureSensitive(before, after, before_sensitive, after_sensitive);
+    });
+    planData.resource_drift?.forEach((ch) => {
+      const { before, after, before_sensitive, after_sensitive } = ch.change;
+      obscureSensitive(before, after, before_sensitive, after_sensitive);
+    });
     return planData;
   }
 
@@ -193,12 +218,14 @@ export class Terraform {
     return obscured;
   }
 
-  async apply() {
+  async apply(config: TApplyConfig) {
     if (!this.projectInfo) this.throwNoInitErr();
     await this.selectWS(this.workspace);
 
+    const targetFlags =
+      config.target?.map((t) => `-target=${t}`).join(" ") || "";
     await this.exec(
-      `terraform apply ${this.getParamFlags()} -input=false ${this.planCacheFile}`
+      `terraform apply ${this.getParamFlags()} ${targetFlags} -input=false ${this.planCacheFile}`
     );
 
     await this.refresh();
