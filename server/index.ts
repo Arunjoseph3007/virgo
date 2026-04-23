@@ -6,7 +6,7 @@ import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { zValidator } from "@hono/zod-validator";
 import { serve } from "@hono/node-server";
-import { Terraform } from "./terraform";
+import { applyConfigSchema, Terraform } from "./terraform";
 import { db } from "./db";
 import { PARAM_TYPES, repos } from "./db/schema";
 import { Repo } from "./repo";
@@ -50,9 +50,9 @@ const routes = new Hono()
   .delete("/repos/:repoId", async (c) => {
     const repoId = parseInt(c.req.param("repoId"));
 
-    const repo = await Repo.init(repoId)
-    await repo.deleteAndCleanup()
-    
+    const repo = await Repo.init(repoId);
+    await repo.deleteAndCleanup();
+
     return c.json({ success: true });
   })
 
@@ -122,15 +122,19 @@ const routes = new Hono()
     if (!res) return c.notFound();
     return c.json({ success: true });
   })
-  .get("/project/:project/:workspace/apply", async (c) => {
-    const { project, workspace } = c.req.param();
+  .post(
+    "/project/:project/:workspace/apply",
+    zValidator("json", applyConfigSchema),
+    async (c) => {
+      const { project, workspace } = c.req.param();
 
-    const tf = await Terraform.init(project, workspace);
-    const res = await tf.apply();
+      const tf = await Terraform.init(project, workspace);
+      const res = await tf.apply(await c.req.json());
 
-    if (!res) return c.notFound();
-    return c.json({ success: true });
-  })
+      if (!res) return c.notFound();
+      return c.json({ success: true });
+    }
+  )
   .get("/project/:project/:workspace/status", async (c) => {
     const { project, workspace } = c.req.param();
 

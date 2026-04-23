@@ -7,6 +7,7 @@ import { client } from "~/client";
 import { CresentIcon, GitBranchIcon } from "~/common/icons";
 import { Dialog } from "~/common/dialog";
 import { ansiToHtml } from "~/utils/ansi";
+import type { TApplyConfig } from "../../server/terraform";
 
 export function meta({}) {
   return [
@@ -314,6 +315,7 @@ function renderDiffNode(
   if (Array.isArray(before) || Array.isArray(after)) {
     const bArr = (before || []) as JsonValue[];
     const aArr = (after || []) as JsonValue[];
+    const afterUnknownArr = (afterUnknown || []) as JsonValue[];
     const max = Math.max(bArr.length, aArr.length);
 
     if (max === 0) return <span className={HIGHLIGHT.punctuation}>{"[]"}</span>;
@@ -330,7 +332,7 @@ function renderDiffNode(
                 bArr[i] ?? null,
                 aArr[i] ?? null,
                 level + 1,
-                afterUnknown[i]
+                afterUnknownArr[i]
               )}
               {",\n"}
             </span>
@@ -354,6 +356,7 @@ function renderDiffNode(
 
     const bObj = (before ?? {}) as Record<string, JsonValue>;
     const aObj = (after ?? {}) as Record<string, JsonValue>;
+    const afterUnknownObj = (afterUnknown ?? {}) as Record<string, JsonValue>;
 
     return (
       <>
@@ -361,7 +364,7 @@ function renderDiffNode(
         {[...keysSet].map((key) => {
           const bVal = bObj[key] ?? null;
           const aVal = aObj[key] ?? null;
-          const afterUnknownVal = afterUnknown[key] ?? null;
+          const afterUnknownVal = afterUnknownObj[key] ?? null;
 
           // array blocks
           if (
@@ -384,7 +387,7 @@ function renderDiffNode(
                     bVal[i] ?? null,
                     aVal[i] ?? null,
                     level + 1,
-                    afterUnknownVal[i]
+                    afterUnknownVal[i] ?? null
                   )}
                   {"\n"}
                 </span>
@@ -659,7 +662,6 @@ function PlanLogs({
   if (logsQuery.data && logsQuery.data.logs == null)
     return <p>Currently there are no errors</p>;
 
-  // Actual Term Escape Regex /(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]/g,
   if (logsQuery.data)
     return (
       <div>
@@ -703,6 +705,7 @@ export default function PlanInfoPage() {
     },
   });
 
+  // TODO this can be combined to single query in wsInfoQuery
   const workspaceQuery = useQuery({
     initialData: [],
     queryKey: ["workspaces", project],
@@ -733,14 +736,16 @@ export default function PlanInfoPage() {
 
   const applyMut = useMutation({
     mutationKey: ["apply-plan", project, workspace],
-    mutationFn: async () => {
-      const res = await client.project[":project"][":workspace"].apply.$get({
+    mutationFn: async (config: TApplyConfig) => {
+      const res = await client.project[":project"][":workspace"].apply.$post({
         param: { project, workspace },
+        json: config,
       });
       return await res.json();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["plan-data"] });
+      qc.invalidateQueries({ queryKey: ["ws-data"] });
     },
   });
 
