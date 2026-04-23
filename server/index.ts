@@ -1,39 +1,32 @@
 import "dotenv/config";
 import { Hono } from "hono";
 import { inspectRoutes, showRoutes } from "hono/dev";
-import z from "zod";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { zValidator } from "@hono/zod-validator";
 import { serve } from "@hono/node-server";
-import { applyConfigSchema, Terraform } from "./terraform";
+import { Terraform } from "./terraform";
 import { db } from "./db";
-import { PARAM_TYPES, repos } from "./db/schema";
+import { repos } from "./db/schema";
 import { Repo } from "./repo";
-import { eq } from "drizzle-orm";
+import {
+  ApplyConfigSchema,
+  RepoInsertSchema,
+  WorkspaceInsertSchema,
+  WorkspaceUpdateSchema,
+} from "./validation";
 
 const routes = new Hono()
-  .get("/health", (c) => c.json({ status: "OK" }))
 
-  .post(
-    "/repos",
-    zValidator(
-      "json",
-      z.object({
-        name: z.string(),
-        url: z.url(),
-      })
-    ),
-    async (c) => {
-      const values = c.req.valid("json");
-      const res = await db.insert(repos).values(values).returning();
+  .post("/repos", zValidator("json", RepoInsertSchema), async (c) => {
+    const values = c.req.valid("json");
+    const res = await db.insert(repos).values(values).returning();
 
-      const repo = await Repo.init(res[0].id);
-      const connected = await repo.tryClone();
+    const repo = await Repo.init(res[0].id);
+    const connected = await repo.tryClone();
 
-      return c.json({ ...res, connected });
-    }
-  )
+    return c.json({ ...res, connected });
+  })
   .get("/repos", async (c) => {
     const repos = await db.query.repos.findMany({ limit: 20 });
 
@@ -65,20 +58,7 @@ const routes = new Hono()
   })
   .post(
     "/project/:project/workspaces",
-    zValidator(
-      "json",
-      z.object({
-        name: z.string(),
-        gitTarget: z.string(),
-        params: z.array(
-          z.object({
-            key: z.string(),
-            value: z.string().optional().nullable(),
-            type: z.enum(PARAM_TYPES),
-          })
-        ),
-      })
-    ),
+    zValidator("json", WorkspaceInsertSchema),
     async (c) => {
       const { project } = c.req.param();
       const workspace = c.req.valid("json");
@@ -89,6 +69,21 @@ const routes = new Hono()
         throw new HTTPException(400, { message: "Couldnt create workspace" });
 
       return c.json({ success: true, workspace: workspace });
+    }
+  )
+  .put(
+    "/project/:project/:workspace",
+    zValidator("json", WorkspaceUpdateSchema),
+    async (c) => {
+      const { project, workspace } = c.req.param();
+      const workspaceInfo = c.req.valid("json");
+
+      const tf = await Terraform.init(project, workspace);
+      const res = await tf.editWs(workspaceInfo);
+      if (!res)
+        throw new HTTPException(400, { message: "Couldnt update workspace" });
+
+      return c.json({ success: true, workspace: workspaceInfo });
     }
   )
   .get("/project/:project/workspaces", async (c) => {
@@ -124,7 +119,7 @@ const routes = new Hono()
   })
   .post(
     "/project/:project/:workspace/apply",
-    zValidator("json", applyConfigSchema),
+    zValidator("json", ApplyConfigSchema),
     async (c) => {
       const { project, workspace } = c.req.param();
 
@@ -155,6 +150,7 @@ app.get("/docs", (c) => {
   showRoutes(routes);
   return c.json(inspectRoutes(routes).filter((r) => !r.isMiddleware));
 });
+app.get("/health", (c) => c.json({ status: "OK" }));
 
 app.onError((error, c) => {
   console.error(`SERVER ERROR: ${error}`);

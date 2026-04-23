@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import type { TerraformPlanData } from "~/types/planData";
 import { db } from "./db";
-import { and, eq, type InferInsertModel } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   params,
   projects,
@@ -14,7 +14,7 @@ import {
   type TWSHealthStatus,
 } from "./db/schema";
 import { unreachable } from "./utils";
-import z from "zod";
+import type { TApplyConfig, TWSInsert, TWSUpdate } from "./validation";
 
 const REPO_ROOT: string = process.env.REPO_ROOT!;
 const CACHE_ROOT: string = process.env.CACHE_ROOT!;
@@ -36,12 +36,6 @@ function obscureSensitive(
 ) {
   return;
 }
-
-export const applyConfigSchema = z.object({
-  target: z.array(z.string()).optional(),
-});
-
-export type TApplyConfig = z.infer<typeof applyConfigSchema>;
 
 export class Terraform {
   project: string;
@@ -67,10 +61,7 @@ export class Terraform {
   async _init() {
     if (this.workspace) {
       const info = await db.query.workspaces.findFirst({
-        where: and(
-          eq(workspaces.projectName, this.project),
-          eq(workspaces.name, this.workspace)
-        ),
+        where: this.wsSelector(),
         with: {
           params: true,
           project: true,
@@ -152,6 +143,15 @@ export class Terraform {
     return path.join(this.cachePath, `${this.workspace}-plan-logs.json`);
   }
 
+  private wsSelector() {
+    if (!this.workspace) this.throwNoInitErr();
+
+    return and(
+      eq(workspaces.name, this.workspace),
+      eq(workspaces.projectName, this.project)
+    );
+  }
+
   private obscureSensitive(planData: TerraformPlanData): TerraformPlanData {
     planData.resource_changes.forEach((ch) => {
       const { before, after, before_sensitive, after_sensitive } = ch.change;
@@ -193,15 +193,7 @@ export class Terraform {
   private async setHealthStatus(health: TWSHealthStatus) {
     if (!this.workspace) this.throwNoInitErr();
 
-    await db
-      .update(workspaces)
-      .set({ health })
-      .where(
-        and(
-          eq(workspaces.name, this.workspace),
-          eq(workspaces.projectName, this.project)
-        )
-      );
+    await db.update(workspaces).set({ health }).where(this.wsSelector());
   }
 
   getStatus(): TerraformPlanData | null {
@@ -273,7 +265,7 @@ export class Terraform {
     return true;
   }
 
-  async addWs(wsInfo: TAddWs) {
+  async addWs(wsInfo: TWSInsert) {
     await db.transaction(async (tx) => {
       await tx
         .insert(workspaces)
@@ -296,19 +288,28 @@ export class Terraform {
     return true;
   }
 
+  async editWs(workspaceInfo: TWSUpdate) {
+    await db.transaction(async (tx) => {
+      if (!this.workspace) this.throwNoInitErr();
+
+      await tx
+        .update(workspaces)
+        .set({ gitTarget: workspaceInfo.gitTarget })
+        .where(this.wsSelector());
+
+      await Promise.all(
+        workspaceInfo.params.map(async (p) => {
+          await tx.update(params).set(p).where(eq(params.id, p.id));
+        })
+      );
+    });
+
+    return true;
+  }
+
   async getPlanLogs() {
     if (!this.workspace) this.throwNoInitErr();
 
-    const r = await db.query.workspaces.findFirst({
-      where: and(
-        eq(workspaces.name, this.workspace),
-        eq(workspaces.projectName, this.project)
-      ),
-      columns: {
-        health: true,
-      },
-    });
-    if (!r) this.throwNoInitErr();
     if (!fs.existsSync(this.planLogsFile)) return null;
 
     return fs.readFileSync(this.planLogsFile).toString();
@@ -320,12 +321,3 @@ export class Terraform {
     });
   }
 }
-
-type TAddWsParams = {
-  params: Omit<
-    InferInsertModel<typeof params>,
-    "workspaceName" | "projectName" | "id"
-  >[];
-};
-type TAddWs = Omit<InferInsertModel<typeof workspaces>, "projectName"> &
-  TAddWsParams;
