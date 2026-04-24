@@ -1,28 +1,66 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-export function Dropdown({
-  title,
-  children,
-}: {
+type TDropDownActions = {
+  render: (p: {
+    active: boolean;
+    disabled: boolean;
+    close: () => void;
+  }) => ReactNode;
+  onClick: (p: { close: () => void }) => void;
+  disabled?: boolean;
+};
+
+type TDropdownProps = {
   title: ReactNode;
-  children: ReactNode;
-}) {
+  actions: TDropDownActions[];
+};
+
+export function Dropdown({ title, actions }: TDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  const close = () => {
+    setOpen(false);
+    setActiveIndex(-1);
+  };
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
+        close();
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  function handleSelect(act: TDropDownActions) {
+    act.onClick({ close });
+    setOpen(false);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLButtonElement>) {
+    if (!open) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, actions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, -1));
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      handleSelect(actions[activeIndex]);
+    } else if (e.key === "Escape") {
+      close();
+    }
+  }
+
   return (
     <div className="relative" ref={ref}>
       <button
+        onKeyDown={handleKeyDown}
         className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
         onClick={() => setOpen((o) => !o)}
       >
@@ -41,8 +79,21 @@ export function Dropdown({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[10rem] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
-          {children}
+        <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[10rem] rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
+          {actions.map((action, i) => (
+            <div
+              key={i}
+              className={`border-2 rounded ${activeIndex == i ? "border-gray-500" : "border-gray-800"}`}
+              onClick={() => handleSelect(action)}
+            >
+              {action.render({
+                active: activeIndex == i,
+                close,
+                disabled:
+                  action.disabled == true || action.disabled == undefined,
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>

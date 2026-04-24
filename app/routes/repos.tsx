@@ -51,7 +51,7 @@ export default function ReposPage() {
       return await res.json();
     },
     onSuccess() {
-      setEditRepo(null)
+      setEditRepo(null);
       qc.invalidateQueries({ queryKey: ["repos-list"] });
     },
   });
@@ -275,34 +275,55 @@ export default function ReposPage() {
                 </span>
               )}
 
-              <Dropdown title={""}>
-                {repo.connected == 0 && (
-                  <button
-                    onClick={() => repoRetryMut.mutate(repo.id)}
-                    disabled={repoRetryMut.isPending}
-                    className={`w-full flex flex-1 gap-2 items-center block px-3 py-2 text-sm transition-colors text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700  disabled:opacity-50`}
-                  >
-                    <RetryIcon />
-                    {repoRetryMut.isPending ? "Retrying..." : "Retry"}
-                  </button>
-                )}
-                <button
-                  onClick={() => setEditRepo(repo)}
-                  disabled={repoDelMut.isPending}
-                  className={`w-full flex flex-1 gap-2 items-center block px-3 py-2 text-sm transition-colors text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700  disabled:opacity-50`}
-                >
-                  <EditIcon />
-                  {repoEditMut.isPending ? "Editing..." : "Edit"}
-                </button>
-                <button
-                  onClick={() => repoDelMut.mutate(repo.id)}
-                  disabled={repoDelMut.isPending}
-                  className={`w-full flex flex-1 gap-2 items-center block px-3 py-2 text-sm transition-colors text-red-600 dark:text-red-400 font-medium bg-red-50 dark:bg-red-950  disabled:opacity-50`}
-                >
-                  <CloseIcon />
-                  {repoDelMut.isPending ? "Deleting..." : "Delete"}
-                </button>
-              </Dropdown>
+              <Dropdown
+                actions={[
+                  {
+                    render: () => (
+                      <button
+                        disabled={repoRetryMut.isPending}
+                        className={`w-full flex flex-1 gap-2 items-center block px-3 py-2 text-sm transition-colors text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700  disabled:opacity-50`}
+                      >
+                        <RetryIcon />
+                        {repoRetryMut.isPending ? "Retrying..." : "Retry"}
+                      </button>
+                    ),
+                    onClick: () => {
+                      repoRetryMut.mutate(repo.id);
+                    },
+                  },
+                  {
+                    render: () => (
+                      <button
+                        disabled={repoDelMut.isPending}
+                        className={`w-full flex flex-1 gap-2 items-center block px-3 py-2 text-sm transition-colors text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700  disabled:opacity-50`}
+                      >
+                        <EditIcon />
+                        {repoEditMut.isPending ? "Editing..." : "Edit"}
+                      </button>
+                    ),
+                    onClick: ({ close }) => {
+                      setEditRepo(repo);
+                      close();
+                    },
+                  },
+                  {
+                    disabled: repoDelMut.isPending,
+                    render: () => (
+                      <button
+                        onClick={() => repoDelMut.mutate(repo.id)}
+                        className={`w-full flex flex-1 gap-2 items-center block px-3 py-2 text-sm transition-colors text-red-600 dark:text-red-400 font-medium bg-red-50 dark:bg-red-950  disabled:opacity-50`}
+                      >
+                        <CloseIcon />
+                        {repoDelMut.isPending ? "Deleting..." : "Delete"}
+                      </button>
+                    ),
+                    onClick: () => {
+                      repoDelMut.mutate(repo.id);
+                    },
+                  },
+                ]}
+                title={""}
+              />
             </div>
           ))}
         </div>

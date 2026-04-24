@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { Dropdown } from "~/common/dropdown";
 import type { ResourceChange, TerraformPlanData } from "~/types/planData";
 import { client } from "~/client";
@@ -685,6 +685,7 @@ export default function PlanInfoPage() {
   const [showLogs, setShowLogs] = useState(false);
 
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const planDataQuery = useQuery({
     queryKey: ["plan-data", project, workspace],
@@ -827,25 +828,41 @@ export default function PlanInfoPage() {
 
             {/* Action buttons */}
             <div className="flex shrink-0 items-center gap-2">
-              <Dropdown title={workspace}>
-                {workspaceQuery.data.map((ws) => (
-                  <Link
-                    key={ws.name}
-                    to={`/projects/${project}/${ws.name}`}
-                    className={`block px-3 py-2 text-sm transition-colors ${ws.name === workspace ? "text-blue-600 dark:text-blue-400 font-medium bg-blue-50 dark:bg-blue-950" : "text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
-                  >
-                    {ws.name}
-                  </Link>
-                ))}
-                <div className="border-t border-gray-100 dark:border-gray-700">
-                  <Link
-                    to={`/projects/${project}/new-ws`}
-                    className="block px-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    + New workspace
-                  </Link>
-                </div>
-              </Dropdown>
+              <Dropdown
+                actions={workspaceQuery.data
+                  .map((ws) => ({
+                    render: () => (
+                      <Link
+                        key={ws.name}
+                        to={`/projects/${project}/${ws.name}`}
+                        className={`block px-3 py-2 text-sm transition-colors ${ws.name === workspace ? "text-blue-600 dark:text-blue-400 font-medium bg-blue-50 dark:bg-blue-950" : "text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
+                      >
+                        {ws.name}
+                      </Link>
+                    ),
+                    onClick: () => {
+                      navigate(`/projects/${project}/${ws.name}`);
+                    },
+                  }))
+                  .concat([
+                    {
+                      render: () => (
+                        <div className="border-t border-gray-100 dark:border-gray-700">
+                          <Link
+                            to={`/projects/${project}/new-ws`}
+                            className="block px-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            + New workspace
+                          </Link>
+                        </div>
+                      ),
+                      onClick: () => {
+                        navigate(`/projects/${project}/new-ws`);
+                      },
+                    },
+                  ])}
+                title={workspace}
+              />
               <button
                 className="cursor-pointer border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
                 onClick={() => refreshMut.mutate()}
