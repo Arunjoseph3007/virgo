@@ -7,7 +7,7 @@ import { client } from "~/client";
 import { CresentIcon, GitBranchIcon } from "~/common/icons";
 import { Dialog } from "~/common/dialog";
 import { ansiToHtml } from "~/utils/ansi";
-import type { TApplyConfig } from "../../server/terraform";
+import type { TApplyConfig } from "../../server/validation";
 
 export function meta({}) {
   return [
@@ -373,7 +373,8 @@ function renderDiffNode(
             isPlainObject(bVal[0]) &&
             Array.isArray(aVal) &&
             aVal.length > 0 &&
-            isPlainObject(aVal[0])
+            isPlainObject(aVal[0]) &&
+            Array.isArray(afterUnknownVal)
           ) {
             const maxn = Math.max(bVal.length, aVal.length);
             return Array.from({ length: maxn }, (_, i) => {
@@ -854,7 +855,7 @@ export default function PlanInfoPage() {
               </button>
               <button
                 className="cursor-pointer border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-green-100 dark:hover:bg-green-900 transition-colors"
-                onClick={() => applyMut.mutate()}
+                onClick={() => applyMut.mutate({})}
                 disabled={applyMut.isPending}
               >
                 {applyMut.isPending ? "Applying…" : "Apply"}

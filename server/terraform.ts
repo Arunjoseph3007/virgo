@@ -15,6 +15,7 @@ import {
 } from "./db/schema";
 import { unreachable } from "./utils";
 import type { TApplyConfig, TWSInsert, TWSUpdate } from "./validation";
+import Lock from "./lock";
 
 const REPO_ROOT: string = process.env.REPO_ROOT!;
 const CACHE_ROOT: string = process.env.CACHE_ROOT!;
@@ -124,7 +125,11 @@ export class Terraform {
 
   private get repoPath() {
     if (!this.projectInfo) this.throwNoInitErr();
-    return path.join(REPO_ROOT, this.projectInfo.folder, this.project);
+    return path.join(
+      REPO_ROOT,
+      this.projectInfo.repoId.toString(),
+      this.projectInfo.folder
+    );
   }
 
   private get cachePath() {
@@ -141,6 +146,12 @@ export class Terraform {
 
   private get planLogsFile() {
     return path.join(this.cachePath, `${this.workspace}-plan-logs.json`);
+  }
+
+  private async revCheckout() {
+    if (!this.workspace || !this.workspaceInfo) this.throwNoInitErr();
+
+    return await this.exec(`git checkout ${this.workspaceInfo.gitTarget}`);
   }
 
   private wsSelector() {
@@ -199,12 +210,9 @@ export class Terraform {
   getStatus(): TerraformPlanData | null {
     if (!this.projectInfo) this.throwNoInitErr();
 
-    this.selectWS(this.workspace);
+    if (!fs.existsSync(this.planCacheJson)) return null;
 
-    const planCacheJson = this.planCacheJson;
-    if (!fs.existsSync(planCacheJson)) return null;
-
-    const res = fs.readFileSync(planCacheJson);
+    const res = fs.readFileSync(this.planCacheJson);
     const json = JSON.parse(res.toString());
     const obscured = this.obscureSensitive(json);
     return obscured;
@@ -212,6 +220,11 @@ export class Terraform {
 
   async apply(config: TApplyConfig) {
     if (!this.projectInfo) this.throwNoInitErr();
+
+    const lc = new Lock(this.projectInfo.repoId);
+    lc.lock();
+
+    await this.revCheckout();
     await this.selectWS(this.workspace);
 
     const targetFlags =
@@ -219,6 +232,8 @@ export class Terraform {
     await this.exec(
       `terraform apply ${this.getParamFlags()} ${targetFlags} -input=false ${this.planCacheFile}`
     );
+
+    lc.release();
 
     await this.refresh();
 
@@ -229,6 +244,10 @@ export class Terraform {
     if (!this.projectInfo) this.throwNoInitErr();
     if (!this.workspace) this.throwNoInitErr();
 
+    const lc = new Lock(this.projectInfo.repoId);
+    lc.lock();
+
+    await this.revCheckout();
     await this.selectWS(this.workspace);
 
     if (!fs.existsSync(this.repoPath)) return false;
@@ -241,6 +260,8 @@ export class Terraform {
       `terraform plan -detailed-exitcode ${this.getParamFlags()} -input=false -out ${this.planCacheFile}`,
       { throwOnError: false }
     );
+
+    lc.release();
 
     if (planRes.exitCode == 0) {
       fs.writeFileSync(this.planLogsFile, planRes.stdout);

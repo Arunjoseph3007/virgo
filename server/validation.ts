@@ -10,6 +10,17 @@ export const RepoInsertSchema = z.object({
   url: z.url(),
 });
 
+export const RepoSearchSchema = z.object({
+  search: z.string().optional(),
+  connected: z.enum(['true','false']).optional(),
+});
+
+export const ProjectInsertSchema = z.object({
+  name: z.string(),
+  repoId: z.int(),
+  folder: z.string().optional(),
+});
+
 export const WorkspaceInsertSchema = z.object({
   name: z.string(),
   gitTarget: z.string(),
@@ -38,3 +49,4 @@ export type TApplyConfig = z.infer<typeof ApplyConfigSchema>;
 export type TRepoInsert = z.infer<typeof RepoInsertSchema>;
 export type TWSInsert = z.infer<typeof WorkspaceInsertSchema>;
 export type TWSUpdate = z.infer<typeof WorkspaceUpdateSchema>;
+export type TProjInsert = z.infer<typeof ProjectInsertSchema>;

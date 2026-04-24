@@ -7,14 +7,17 @@ import { zValidator } from "@hono/zod-validator";
 import { serve } from "@hono/node-server";
 import { Terraform } from "./terraform";
 import { db } from "./db";
-import { repos } from "./db/schema";
+import { projects, repos } from "./db/schema";
 import { Repo } from "./repo";
 import {
   ApplyConfigSchema,
+  ProjectInsertSchema,
   RepoInsertSchema,
+  RepoSearchSchema,
   WorkspaceInsertSchema,
   WorkspaceUpdateSchema,
 } from "./validation";
+import { and, eq, like, or } from "drizzle-orm";
 
 const routes = new Hono()
 
@@ -27,10 +30,21 @@ const routes = new Hono()
 
     return c.json({ ...res, connected });
   })
-  .get("/repos", async (c) => {
-    const repos = await db.query.repos.findMany({ limit: 20 });
+  .get("/repos", zValidator("query", RepoSearchSchema), async (c) => {
+    const query = c.req.valid("query");
+    const search = `%${query.search || ""}%`;
 
-    return c.json(repos);
+    const res = await db.query.repos.findMany({
+      limit: 20,
+      where: and(
+        or(like(repos.name, search), like(repos.url, search)),
+        query.connected
+          ? eq(repos.connected, Number(query.connected == "true"))
+          : undefined
+      ),
+    });
+
+    return c.json(res);
   })
   .post("/repos/:repoId/retry", async (c) => {
     const repoId = c.req.param("repoId");
@@ -49,6 +63,15 @@ const routes = new Hono()
     return c.json({ success: true });
   })
 
+  .post("/project", zValidator("json", ProjectInsertSchema), async (c) => {
+    const proj = await c.req.json();
+    const ret = await db.insert(projects).values(proj).returning();
+
+    if (ret.length == 0)
+      throw new HTTPException(401, { message: "Couldnt insert project" });
+
+    return c.json({ success: true, project: ret[0] });
+  })
   .get("/project", async (c) => {
     const projs = await db.query.projects.findMany({
       with: { workspaces: true },
