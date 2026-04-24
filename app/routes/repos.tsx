@@ -4,9 +4,12 @@ import { Link } from "react-router";
 import { client } from "~/client";
 import { Dialog } from "~/common/dialog";
 import { Dropdown } from "~/common/dropdown";
-import { CloseIcon, RetryIcon } from "~/common/icons";
+import { CloseIcon, EditIcon, RetryIcon } from "~/common/icons";
 import { TextInput } from "~/common/input";
 import Loader from "~/common/Loader";
+import type { TRepo } from "../../server/db/schema";
+import { useImmer } from "use-immer";
+import type { TRepoUpdate } from "../../server/validation";
 
 export default function ReposPage() {
   const qc = useQueryClient();
@@ -14,6 +17,7 @@ export default function ReposPage() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [repoName, setRepoName] = useState("");
   const [repoUrl, setRepoUrl] = useState("");
+  const [editRepo, setEditRepo] = useImmer<TRepo | null>(null);
 
   const reposDataQuery = useQuery({
     queryKey: ["repos-list"],
@@ -33,6 +37,21 @@ export default function ReposPage() {
       return await res.json();
     },
     onSuccess() {
+      qc.invalidateQueries({ queryKey: ["repos-list"] });
+    },
+  });
+
+  const repoEditMut = useMutation({
+    mutationKey: ["repo-edit"],
+    mutationFn: async (repoInfo: TRepoUpdate & { id: number }) => {
+      const res = await client.repos[":repoId"].$put({
+        param: { repoId: repoInfo.id.toString() },
+        json: repoInfo,
+      });
+      return await res.json();
+    },
+    onSuccess() {
+      setEditRepo(null)
       qc.invalidateQueries({ queryKey: ["repos-list"] });
     },
   });
@@ -75,7 +94,7 @@ export default function ReposPage() {
           <div className="min-w-0">
             {/* Breadcrumb */}
             <p className="text-xs text-gray-400 dark:text-gray-500 font-mono mb-1 tracking-wide">
-              <span className="text-gray-600 dark:text-gray-300">Lorem</span>
+              <span className="text-gray-600 dark:text-gray-300">Virgo</span>
             </p>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
               Repositories
@@ -103,7 +122,6 @@ export default function ReposPage() {
                   onClick() {
                     setShowAddDialog(false);
                   },
-                  variant: "danger",
                 },
               ]}
               title="Connect Repository"
@@ -141,6 +159,64 @@ export default function ReposPage() {
             </button>
           </div>
         </div>
+
+        {/* Edit Repo */}
+        <Dialog
+          onClose={() => setEditRepo(null)}
+          actions={[
+            {
+              label: "Edit",
+              onClick() {
+                if (!editRepo || !editRepo.name || !editRepo.url) {
+                  alert("Name and URL must be defined");
+                  return;
+                }
+                repoEditMut.mutate(editRepo);
+              },
+              variant: "primary",
+            },
+            {
+              label: "Cancel",
+              onClick() {
+                setEditRepo(null);
+              },
+            },
+          ]}
+          title="Edit Repository"
+          open={!!editRepo}
+        >
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 space-y-4">
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Repository Name
+              </label>
+              <TextInput
+                value={editRepo?.name}
+                setValue={(val) =>
+                  setEditRepo((e) => {
+                    e!.name = val;
+                  })
+                }
+                placeholder="e.g. infra"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Repo Url
+              </label>
+              <TextInput
+                value={editRepo?.url}
+                setValue={(val) =>
+                  setEditRepo((e) => {
+                    e!.url = val;
+                  })
+                }
+                placeholder="e.g. https://github.com/org/repo.git"
+              />
+            </div>
+          </div>
+        </Dialog>
 
         {/* Summary bar */}
         <div className="mb-6 flex flex-wrap gap-3">
@@ -210,6 +286,14 @@ export default function ReposPage() {
                     {repoRetryMut.isPending ? "Retrying..." : "Retry"}
                   </button>
                 )}
+                <button
+                  onClick={() => setEditRepo(repo)}
+                  disabled={repoDelMut.isPending}
+                  className={`w-full flex flex-1 gap-2 items-center block px-3 py-2 text-sm transition-colors text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700  disabled:opacity-50`}
+                >
+                  <EditIcon />
+                  {repoEditMut.isPending ? "Editing..." : "Edit"}
+                </button>
                 <button
                   onClick={() => repoDelMut.mutate(repo.id)}
                   disabled={repoDelMut.isPending}

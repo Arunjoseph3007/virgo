@@ -10,9 +10,11 @@ export const RepoInsertSchema = z.object({
   url: z.url(),
 });
 
+export const RepoUpdateSchema = RepoInsertSchema;
+
 export const RepoSearchSchema = z.object({
   search: z.string().optional(),
-  connected: z.enum(['true','false']).optional(),
+  connected: z.enum(["true", "false"]).optional(),
 });
 
 export const ProjectInsertSchema = z.object({
@@ -21,32 +23,28 @@ export const ProjectInsertSchema = z.object({
   folder: z.string().optional(),
 });
 
+const ParamInsertSchema = z.object({
+  key: z.string(),
+  value: z.string().optional().nullable(),
+  type: z.enum(PARAM_TYPES),
+});
+
+const ParamUpdateSchema = ParamInsertSchema.extend({ id: z.int() });
+
 export const WorkspaceInsertSchema = z.object({
   name: z.string(),
   gitTarget: z.string(),
-  params: z.array(
-    z.object({
-      key: z.string(),
-      value: z.string().optional().nullable(),
-      type: z.enum(PARAM_TYPES),
-    })
-  ),
+  params: z.array(ParamInsertSchema),
 });
 
 export const WorkspaceUpdateSchema = z.object({
   gitTarget: z.string(),
-  params: z.array(
-    z.object({
-      id: z.int(),
-      key: z.string(),
-      value: z.string().optional().nullable(),
-      type: z.enum(PARAM_TYPES),
-    })
-  ),
+  params: z.array(z.object(ParamUpdateSchema)),
 });
 
 export type TApplyConfig = z.infer<typeof ApplyConfigSchema>;
 export type TRepoInsert = z.infer<typeof RepoInsertSchema>;
+export type TRepoUpdate = z.infer<typeof RepoUpdateSchema>;
 export type TWSInsert = z.infer<typeof WorkspaceInsertSchema>;
 export type TWSUpdate = z.infer<typeof WorkspaceUpdateSchema>;
 export type TProjInsert = z.infer<typeof ProjectInsertSchema>;

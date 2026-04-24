@@ -14,6 +14,7 @@ import {
   ProjectInsertSchema,
   RepoInsertSchema,
   RepoSearchSchema,
+  RepoUpdateSchema,
   WorkspaceInsertSchema,
   WorkspaceUpdateSchema,
 } from "./validation";
@@ -28,7 +29,18 @@ const routes = new Hono()
     const repo = await Repo.init(res[0].id);
     const connected = await repo.tryClone();
 
-    return c.json({ ...res, connected });
+    return c.json({ ...res[0], connected });
+  })
+  .put("/repos/:repoId", zValidator("json", RepoUpdateSchema), async (c) => {
+    const { repoId } = c.req.param();
+    const values = c.req.valid("json");
+    const res = await db
+      .update(repos)
+      .set(values)
+      .where(eq(repos.id, parseInt(repoId)))
+      .returning();
+
+    return c.json({ ...res[0] });
   })
   .get("/repos", zValidator("query", RepoSearchSchema), async (c) => {
     const query = c.req.valid("query");
