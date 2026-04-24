@@ -54,7 +54,7 @@ export default function NewProjectPage() {
               label="Project Name"
               type="text"
               value={projName}
-              onChange={(e) => setProjName(e.target.value)}
+              setValue={setProjName}
               placeholder="e.g. dev"
             />
           </div>
@@ -98,6 +98,7 @@ export default function NewProjectPage() {
                   </span>
                 </div>
               )}
+              getKey={(v) => v.id}
               onSelect={setRepo}
               placeholder="eg. my repo"
             />
@@ -108,7 +109,7 @@ export default function NewProjectPage() {
               label="Folder"
               type="text"
               value={folder}
-              onChange={(e) => setFolder(e.target.value)}
+              setValue={setFolder}
               placeholder="e.g. ., ./infra"
             />
           </div>

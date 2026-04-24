@@ -116,7 +116,7 @@ export default function ReposPage() {
                   </label>
                   <TextInput
                     value={repoName}
-                    onChange={(e) => setRepoName(e.target.value)}
+                    setValue={setRepoName}
                     placeholder="e.g. infra"
                   />
                 </div>
@@ -127,7 +127,7 @@ export default function ReposPage() {
                   </label>
                   <TextInput
                     value={repoUrl}
-                    onChange={(e) => setRepoUrl(e.target.value)}
+                    setValue={setRepoUrl}
                     placeholder="e.g. https://github.com/org/repo.git"
                   />
                 </div>

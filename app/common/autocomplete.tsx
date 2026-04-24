@@ -22,7 +22,6 @@ export function AutoComplete<T>({
   ...props
 }: TTextInputProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const [val, setVal] = useState("");
   const [suggs, setSuggs] = useState<T[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -86,11 +85,10 @@ export function AutoComplete<T>({
       <TextInput
         label={label}
         value={val}
-        onChange={(e) => setVal(e.target.value)}
+        setValue={setVal}
         onFocus={() => setIsOpen(true)}
         onKeyDown={handleKeyDown}
         className={className}
-        ref={inputRef}
         {...props}
       />
       {showDropdown && (

@@ -68,7 +68,7 @@ export default function NewWorkspacePage() {
           <div className="space-y-1">
             <TextInput
               value={wsName}
-              onChange={(e) => setWsName(e.target.value)}
+              setValue={setWsName}
               placeholder="e.g. dev"
               label="Workspace name"
             />
@@ -77,7 +77,7 @@ export default function NewWorkspacePage() {
           <div className="space-y-1">
             <TextInput
               value={gitTarget}
-              onChange={(e) => setGitTarget(e.target.value)}
+              setValue={setGitTarget}
               placeholder="e.g. main"
               label="Git Target"
             />
@@ -94,11 +94,7 @@ export default function NewWorkspacePage() {
             <div key={i} className="flex items-center gap-2">
               <TextInput
                 value={vf}
-                onChange={(e) => {
-                  setVarFiles((vfs) => {
-                    vfs[i] = e.target.value;
-                  });
-                }}
+                setValue={(e) => setVarFiles((vfs) => (vfs[i] = e))}
               />
               <button
                 onClick={() => {
@@ -116,7 +112,7 @@ export default function NewWorkspacePage() {
           <div className="flex items-center gap-2">
             <TextInput
               value={newVarFile}
-              onChange={(e) => setNewVarFile(e.target.value)}
+              setValue={setNewVarFile}
               placeholder="filename.tfvars"
             />
             <button
@@ -144,20 +140,12 @@ export default function NewWorkspacePage() {
             <div key={i} className="flex items-center gap-2">
               <TextInput
                 value={v.key}
-                onChange={(e) => {
-                  setVars((vfs) => {
-                    vfs[i].key = e.target.value;
-                  });
-                }}
+                setValue={(e) => setVars((vfs) => (vfs[i].key = e))}
                 placeholder="Key"
               />
               <TextInput
                 value={v.value}
-                onChange={(e) => {
-                  setVars((vfs) => {
-                    vfs[i].value = e.target.value;
-                  });
-                }}
+                setValue={(e) => setVars((vfs) => (vfs[i].value = e))}
                 placeholder="Value"
               />
               <button
@@ -176,12 +164,12 @@ export default function NewWorkspacePage() {
           <div className="flex items-center gap-2">
             <TextInput
               value={newVarKey}
-              onChange={(e) => setNewVarKey(e.target.value)}
+              setValue={setNewVarKey}
               placeholder="Key"
             />
             <TextInput
               value={newVarVal}
-              onChange={(e) => setNewVarVal(e.target.value)}
+              setValue={setNewVarVal}
               placeholder="Value"
             />
             <button
