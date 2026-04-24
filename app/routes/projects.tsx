@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { client } from "~/client";
 import type { WS_STATES } from "../../server/db/schema";
+import { PlusIcon } from "~/common/icons";
 
 type WsHealth = (typeof WS_STATES)[number];
 
@@ -58,10 +59,19 @@ function ProjectCard({ project }: { project: Project }) {
               {project.folder}
             </p>
           </div>
-          <span className="shrink-0 text-xs text-gray-400 dark:text-gray-600">
-            {project.workspaces.length} workspace
-            {project.workspaces.length !== 1 ? "s" : ""}
-          </span>
+
+          <div className="flex gap-4 items-center">
+            <span className="shrink-0 text-xs text-gray-400 dark:text-gray-600">
+              {project.workspaces.length} workspace
+              {project.workspaces.length !== 1 ? "s" : ""}
+            </span>
+            <Link
+              className="flex items-center gap-1 rounded-full px-4 py-1 bg-green-900 text-sm"
+              to={`/projects/${project.name}/new-ws`}
+            >
+              <PlusIcon /> Add
+            </Link>
+          </div>
         </div>
 
         {project.workspaces.length > 0 && (
