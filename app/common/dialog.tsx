@@ -29,7 +29,7 @@ export function Dialog({
   if (!open) return null;
 
   const actionVariants: Record<NonNullable<DialogAction["variant"]>, string> = {
-    primary: "bg-blue-600 hover:bg-blue-500 text-white",
+    primary: "bg-orange-600 hover:bg-orange-500 text-white",
     secondary: "bg-gray-700 hover:bg-gray-600 text-gray-100",
     danger: "bg-red-700 hover:bg-red-600 text-white",
   };

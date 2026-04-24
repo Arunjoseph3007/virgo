@@ -6,9 +6,7 @@ import { useImmer } from "use-immer";
 import { CloseIcon, PlusIcon } from "~/common/icons";
 import type { InferInsertModel } from "drizzle-orm";
 import type { params } from "../../server/db/schema";
-
-const inputClass =
-  "w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500";
+import { TextInput } from "~/common/input";
 
 export default function NewWorkspacePage() {
   const navigate = useNavigate();
@@ -40,7 +38,6 @@ export default function NewWorkspacePage() {
       });
 
       console.log(newParams);
-      
 
       const res = await client.project[":project"].workspaces.$post({
         json: { name: ws, gitTarget, params: newParams },
@@ -69,28 +66,20 @@ export default function NewWorkspacePage() {
         {/* Basic info */}
         <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 space-y-4">
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Workspace name
-            </label>
-            <input
-              type="text"
+            <TextInput
               value={wsName}
               onChange={(e) => setWsName(e.target.value)}
-              className={inputClass}
               placeholder="e.g. dev"
+              label="Workspace name"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Git target
-            </label>
-            <input
-              type="text"
+            <TextInput
               value={gitTarget}
               onChange={(e) => setGitTarget(e.target.value)}
-              className={inputClass}
               placeholder="e.g. main"
+              label="Git Target"
             />
           </div>
         </div>
@@ -103,15 +92,13 @@ export default function NewWorkspacePage() {
 
           {varFiles.map((vf, i) => (
             <div key={i} className="flex items-center gap-2">
-              <input
-                type="text"
+              <TextInput
                 value={vf}
                 onChange={(e) => {
                   setVarFiles((vfs) => {
                     vfs[i] = e.target.value;
                   });
                 }}
-                className={inputClass}
               />
               <button
                 onClick={() => {
@@ -127,12 +114,10 @@ export default function NewWorkspacePage() {
           ))}
 
           <div className="flex items-center gap-2">
-            <input
-              type="text"
+            <TextInput
               value={newVarFile}
               onChange={(e) => setNewVarFile(e.target.value)}
               placeholder="filename.tfvars"
-              className={inputClass}
             />
             <button
               onClick={() => {
@@ -157,8 +142,7 @@ export default function NewWorkspacePage() {
 
           {vars.map((v, i) => (
             <div key={i} className="flex items-center gap-2">
-              <input
-                type="text"
+              <TextInput
                 value={v.key}
                 onChange={(e) => {
                   setVars((vfs) => {
@@ -166,10 +150,8 @@ export default function NewWorkspacePage() {
                   });
                 }}
                 placeholder="Key"
-                className={inputClass}
               />
-              <input
-                type="text"
+              <TextInput
                 value={v.value}
                 onChange={(e) => {
                   setVars((vfs) => {
@@ -177,7 +159,6 @@ export default function NewWorkspacePage() {
                   });
                 }}
                 placeholder="Value"
-                className={inputClass}
               />
               <button
                 onClick={() => {
@@ -193,19 +174,15 @@ export default function NewWorkspacePage() {
           ))}
 
           <div className="flex items-center gap-2">
-            <input
-              type="text"
+            <TextInput
               value={newVarKey}
               onChange={(e) => setNewVarKey(e.target.value)}
               placeholder="Key"
-              className={inputClass}
             />
-            <input
-              type="text"
+            <TextInput
               value={newVarVal}
               onChange={(e) => setNewVarVal(e.target.value)}
               placeholder="Value"
-              className={inputClass}
             />
             <button
               onClick={() => {

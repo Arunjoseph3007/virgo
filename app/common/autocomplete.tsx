@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-
-const inputClass =
-  "w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500";
+import { TextInput } from "./input";
 
 type TTextInputProps<T> = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
@@ -35,7 +33,7 @@ export function AutoComplete<T>({
   useEffect(() => {
     if (!isOpen) return;
     setIsLoading(true);
-    
+
     const timer = setTimeout(() => {
       getSuggestions(val)
         .then((results) => {
@@ -76,7 +74,6 @@ export function AutoComplete<T>({
     } else if (e.key === "Enter" && activeIndex >= 0) {
       e.preventDefault();
       handleSelect(suggs[activeIndex]);
-      setIsOpen(false)
     } else if (e.key === "Escape") {
       setIsOpen(false);
     }
@@ -86,23 +83,18 @@ export function AutoComplete<T>({
 
   return (
     <div className="relative space-y-1" ref={containerRef}>
-      {label && (
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          {label}
-        </label>
-      )}
-      <input
-        type="text"
+      <TextInput
+        label={label}
         value={val}
         onChange={(e) => setVal(e.target.value)}
         onFocus={() => setIsOpen(true)}
         onKeyDown={handleKeyDown}
-        className={`${inputClass} ${className ?? ""}`}
+        className={className}
         ref={inputRef}
         {...props}
       />
       {showDropdown && (
-        <div className="absolute right-0 left-0 top-full z-10 mt-1 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg">
+        <div className="absolute right-0 left-0 top-full z-10 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg">
           {isLoading ? (
             <div className="px-3 py-2 text-sm text-gray-400">Loading…</div>
           ) : (

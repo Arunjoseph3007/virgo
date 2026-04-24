@@ -1,3 +1,5 @@
+import { forwardRef } from "react";
+
 const inputClass =
   "w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500";
 
@@ -5,7 +7,7 @@ type TTextInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
 };
 
-export function TextInput({
+function _TextInput({
   className,
   value,
   onClick,
@@ -24,9 +26,11 @@ export function TextInput({
         type="text"
         value={value}
         onClick={onClick}
-        className={inputClass + className}
+        className={inputClass + " " + className}
         {...props}
       />
     </>
   );
 }
+
+export const TextInput = forwardRef(_TextInput);

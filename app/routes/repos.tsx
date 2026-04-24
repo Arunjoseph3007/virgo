@@ -5,10 +5,8 @@ import { client } from "~/client";
 import { Dialog } from "~/common/dialog";
 import { Dropdown } from "~/common/dropdown";
 import { CloseIcon, RetryIcon } from "~/common/icons";
+import { TextInput } from "~/common/input";
 import Loader from "~/common/Loader";
-
-const inputClass =
-  "w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500";
 
 export default function ReposPage() {
   const qc = useQueryClient();
@@ -20,7 +18,7 @@ export default function ReposPage() {
   const reposDataQuery = useQuery({
     queryKey: ["repos-list"],
     queryFn: async () => {
-      const res = await client.repos.$get();
+      const res = await client.repos.$get({ query: {} });
       return await res.json();
     },
     initialData: [],
@@ -116,11 +114,9 @@ export default function ReposPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Repository Name
                   </label>
-                  <input
-                    type="text"
+                  <TextInput
                     value={repoName}
                     onChange={(e) => setRepoName(e.target.value)}
-                    className={inputClass}
                     placeholder="e.g. infra"
                   />
                 </div>
@@ -129,11 +125,9 @@ export default function ReposPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Repo Url
                   </label>
-                  <input
-                    type="text"
+                  <TextInput
                     value={repoUrl}
                     onChange={(e) => setRepoUrl(e.target.value)}
-                    className={inputClass}
                     placeholder="e.g. https://github.com/org/repo.git"
                   />
                 </div>
