@@ -29,7 +29,7 @@ const ParamInsertSchema = z.object({
   type: z.enum(PARAM_TYPES),
 });
 
-const ParamUpdateSchema = ParamInsertSchema.extend({ id: z.int() });
+const ParamUpdateSchema = ParamInsertSchema;
 
 export const WorkspaceInsertSchema = z.object({
   name: z.string(),
@@ -39,7 +39,7 @@ export const WorkspaceInsertSchema = z.object({
 
 export const WorkspaceUpdateSchema = z.object({
   gitTarget: z.string(),
-  params: z.array(z.object(ParamUpdateSchema)),
+  params: z.array(ParamUpdateSchema),
 });
 
 export type TApplyConfig = z.infer<typeof ApplyConfigSchema>;
@@ -48,3 +48,5 @@ export type TRepoUpdate = z.infer<typeof RepoUpdateSchema>;
 export type TWSInsert = z.infer<typeof WorkspaceInsertSchema>;
 export type TWSUpdate = z.infer<typeof WorkspaceUpdateSchema>;
 export type TProjInsert = z.infer<typeof ProjectInsertSchema>;
+export type TParamInsert = z.infer<typeof ParamInsertSchema>;
+export type TParamUpdate = z.infer<typeof ParamUpdateSchema>;

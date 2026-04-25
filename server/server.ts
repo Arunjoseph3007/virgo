@@ -132,7 +132,12 @@ const routes = new Hono()
     const { project, workspace } = c.req.param();
 
     const tf = await Terraform.init(project, workspace);
-    return c.json(tf.workspaceInfo);
+    const { workspaceInfo, projectInfo, params } = tf;
+    if (!workspaceInfo) {
+      throw new HTTPException(404, { message: "Workspace Info not found" });
+    }
+
+    return c.json({ workspaceInfo, projectInfo, params });
   })
   .get("/project/:project/:workspace/logs", async (c) => {
     const { project, workspace } = c.req.param();

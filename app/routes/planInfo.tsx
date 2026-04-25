@@ -4,10 +4,19 @@ import { Link, useNavigate, useParams } from "react-router";
 import { Dropdown } from "~/common/dropdown";
 import type { ResourceChange, TerraformPlanData } from "~/types/planData";
 import { client } from "~/client";
-import { CresentIcon, GitBranchIcon } from "~/common/icons";
+import {
+  CloseIcon,
+  CresentIcon,
+  GitBranchIcon,
+  PlusIcon,
+} from "~/common/icons";
 import { Dialog } from "~/common/dialog";
 import { ansiToHtml } from "~/utils/ansi";
-import type { TApplyConfig } from "../../server/validation";
+import type { TApplyConfig, TParamUpdate } from "../../server/validation";
+import { SidePanel } from "~/common/sidePanel";
+import type { TParam, TWorkspace } from "../../server/db/schema";
+import { useImmer } from "use-immer";
+import { TextInput } from "~/common/input";
 
 export function meta({}) {
   return [
@@ -678,11 +687,214 @@ function PlanLogs({
   return null;
 }
 
+function EditPanel({
+  open,
+  setOpen,
+  params,
+  workspaceInfo,
+}: {
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  params: TParam[];
+  workspaceInfo: TWorkspace;
+}) {
+  const qc = useQueryClient();
+  const param = useParams();
+  const project = param.project!;
+
+  const [gitTarget, setGitTarget] = useState(workspaceInfo.gitTarget);
+  const [varFiles, setVarFiles] = useImmer<string[]>(
+    params.filter((p) => p.type == "var-file").map((p) => p.key)
+  );
+  const [vars, setVars] = useImmer<{ key: string; value: string }[]>(
+    params
+      .filter((p) => p.type == "var")
+      .map((p) => ({ key: p.key, value: p.value! }))
+  );
+
+  const [newVarFile, setNewVarFile] = useState("");
+  const [newVarKey, setNewVarKey] = useState("");
+  const [newVarVal, setNewVarVal] = useState("");
+
+  const editWsMut = useMutation({
+    mutationKey: ["edit-workspace", project],
+    mutationFn: async () => {
+      const newParams: TParamUpdate[] = [];
+
+      varFiles.forEach((vf) => {
+        newParams.push({ key: vf, type: "var-file" });
+      });
+      vars.forEach((vs) => {
+        newParams.push({ key: vs.key, value: vs.value, type: "var" });
+      });
+
+      const res = await client.project[":project"][":workspace"].$put({
+        json: { gitTarget, params: newParams },
+        param: { project, workspace: workspaceInfo.name },
+      });
+      return await res.json();
+    },
+    onSuccess: () => {
+      setOpen(false);
+      qc.invalidateQueries({ queryKey: ["ws-data"] });
+    },
+  });
+
+  return (
+    <SidePanel
+      // I am aware that this spells QWorkspace.
+      // It is not a speeling mistake, but a deliberate choice
+      // never make any attempts to bend this to the restrictions of your feeble world
+      // For it its destiny to have the extra consonant
+      title="Edit QWorkspace"
+      onClose={() => setOpen(false)}
+      open={open}
+      actions={[
+        {
+          label: editWsMut.isPending ? "Editing..." : "Edit Workspace",
+          onClick() {
+            editWsMut.mutate();
+          },
+          variant: "primary",
+        },
+        {
+          label: "Close",
+          onClick() {
+            setOpen(false);
+          },
+        },
+      ]}
+    >
+      {/* Basic info */}
+      <div className="mb-3 dark:border-gray-800 bg-white dark:bg-gray-900 px-2 space-y-4">
+        <div className="space-y-1">
+          <TextInput
+            value={gitTarget}
+            setValue={setGitTarget}
+            placeholder="e.g. main"
+            label="Git Target"
+          />
+        </div>
+      </div>
+
+      <hr className="my-6 mx-2 border-gray-800" />
+
+      {/* Variable Files */}
+      <div className="mb-3 dark:border-gray-800 bg-white dark:bg-gray-900 px-2 space-y-3">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+          Variable Files
+        </h3>
+
+        {varFiles.map((vf, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <TextInput
+              value={vf}
+              setValue={(e) => setVarFiles((vfs) => (vfs[i] = e))}
+            />
+            <button
+              onClick={() => {
+                setVarFiles((vfs) => {
+                  vfs.splice(i, 1);
+                });
+              }}
+              className="shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        ))}
+
+        <div className="flex items-center gap-2">
+          <TextInput
+            value={newVarFile}
+            setValue={setNewVarFile}
+            placeholder="filename.tfvars"
+          />
+          <button
+            onClick={() => {
+              setVarFiles((vfs) => {
+                vfs.push(newVarFile);
+              });
+              setNewVarFile("");
+            }}
+            disabled={!newVarFile}
+            className="shrink-0 rounded-lg p-2 text-white transition-colors bg-green-500 hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <PlusIcon />
+          </button>
+        </div>
+      </div>
+
+      <hr className="my-6 mx-2 border-gray-800" />
+
+      {/* Variables */}
+      <div className="mb-3 dark:border-gray-800 bg-white dark:bg-gray-900 px-2 space-y-3">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+          Variables
+        </h3>
+
+        {vars.map((v, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <TextInput
+              value={v.key}
+              setValue={(e) => setVars((vfs) => (vfs[i].key = e))}
+              placeholder="Key"
+            />
+            <TextInput
+              value={v.value}
+              setValue={(e) => setVars((vfs) => (vfs[i].value = e))}
+              placeholder="Value"
+            />
+            <button
+              onClick={() => {
+                setVars((vs) => {
+                  vs.splice(i, 1);
+                });
+              }}
+              className="shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        ))}
+
+        <div className="flex items-center gap-2">
+          <TextInput
+            value={newVarKey}
+            setValue={setNewVarKey}
+            placeholder="Key"
+          />
+          <TextInput
+            value={newVarVal}
+            setValue={setNewVarVal}
+            placeholder="Value"
+          />
+          <button
+            onClick={() => {
+              setVars((vs) => {
+                vs.push({ key: newVarKey, value: newVarVal });
+              });
+              setNewVarKey("");
+              setNewVarVal("");
+            }}
+            disabled={!newVarKey || !newVarVal}
+            className="shrink-0 rounded-lg p-2 text-white transition-colors bg-green-500 hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <PlusIcon />
+          </button>
+        </div>
+      </div>
+    </SidePanel>
+  );
+}
+
 export default function PlanInfoPage() {
   const param = useParams();
   const project = param.project!;
   const workspace = param.workspace!;
   const [showLogs, setShowLogs] = useState(false);
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -782,7 +994,7 @@ export default function PlanInfoPage() {
       .length,
   };
 
-  const wsInfo = wsInfoQuery.data;
+  const wsInfo = wsInfoQuery.data?.workspaceInfo;
 
   const HEALTH_STYLES: Record<string, string> = {
     SYNC: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 border-green-200 dark:border-green-800",
@@ -869,6 +1081,12 @@ export default function PlanInfoPage() {
                 disabled={refreshMut.isPending}
               >
                 {refreshMut.isPending ? "Refreshing…" : "Refresh"}
+              </button>
+              <button
+                className="cursor-pointer border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-yellow-100 dark:hover:bg-yellow-900 transition-colors"
+                onClick={() => setEditDialogOpen(true)}
+              >
+                Edit
               </button>
               <button
                 className="cursor-pointer border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-green-100 dark:hover:bg-green-900 transition-colors"
@@ -976,6 +1194,16 @@ export default function PlanInfoPage() {
             </div>
           )}
         </div>
+
+        {/* Edit Panel */}
+        {wsInfoQuery.data && (
+          <EditPanel
+            open={editDialogOpen}
+            setOpen={setEditDialogOpen}
+            params={wsInfoQuery.data.params}
+            workspaceInfo={wsInfoQuery.data.workspaceInfo}
+          />
+        )}
 
         {/* Resource cards */}
         <div className="space-y-3">

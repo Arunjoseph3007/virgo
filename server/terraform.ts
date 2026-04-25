@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import type { TerraformPlanData } from "~/types/planData";
 import { db } from "./db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   params,
   projects,
@@ -75,10 +75,9 @@ export class Terraform {
         return;
       }
 
-      this.params = info.params;
-      this.projectInfo = info.project;
-
       const { project, params, ...wsInfo } = info;
+      this.params = params;
+      this.projectInfo = project;
       this.workspaceInfo = wsInfo;
     } else {
       this.projectInfo = await db.query.projects.findFirst({
@@ -318,10 +317,22 @@ export class Terraform {
         .set({ gitTarget: workspaceInfo.gitTarget })
         .where(this.wsSelector());
 
-      await Promise.all(
-        workspaceInfo.params.map(async (p) => {
-          await tx.update(params).set(p).where(eq(params.id, p.id));
-        })
+      // diffing is sligthly complicated so just delete all and recreate
+      await tx
+        .delete(params)
+        .where(
+          and(
+            eq(params.projectName, this.project),
+            eq(params.workspaceName, this.workspace)
+          )
+        );
+
+      await tx.insert(params).values(
+        workspaceInfo.params.map((p) => ({
+          ...p,
+          projectName: this.project,
+          workspaceName: this.workspace!,
+        }))
       );
     });
 
