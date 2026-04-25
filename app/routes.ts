@@ -1,9 +1,19 @@
-import { type RouteConfig, route } from "@react-router/dev/routes";
+import {
+  type RouteConfig,
+  index,
+  layout,
+  prefix,
+  route,
+} from "@react-router/dev/routes";
 
 export default [
-  route("repos", "routes/repos.tsx"),
-  route("projects", "routes/projects.tsx"),
-  route("projects/new", "routes/newProject.tsx"),
-  route("projects/:project/new-ws", "routes/newWorkspace.tsx"),
-  route("projects/:project/:workspace", "routes/planInfo.tsx"),
+  layout("layouts/sidebarLayout.tsx", [
+    route("repos", "routes/repos.tsx"),
+    ...prefix("projects", [
+      index("routes/projects.tsx"),
+      route("new", "routes/newProject.tsx"),
+      route(":project/new-ws", "routes/newWorkspace.tsx"),
+      route(":project/:workspace", "routes/planInfo.tsx"),
+    ]),
+  ]),
 ] satisfies RouteConfig;

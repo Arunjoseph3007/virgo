@@ -10,6 +10,7 @@ import Loader from "~/common/Loader";
 import type { TRepo } from "../../server/db/schema";
 import { useImmer } from "use-immer";
 import type { TRepoUpdate } from "../../server/validation";
+import ToolTip from "~/common/tooltip";
 
 export default function ReposPage() {
   const qc = useQueryClient();
@@ -115,7 +116,7 @@ export default function ReposPage() {
                     }
                     repoCreateMut.mutate({ name: repoName, url: repoUrl });
                   },
-                  variant: "secondary",
+                  variant: "primary",
                 },
                 {
                   label: "Cancel",
@@ -254,14 +255,16 @@ export default function ReposPage() {
                 <p className="font-semibold text-gray-900 dark:text-white truncate">
                   {repo.name}
                 </p>
-                <Link
-                  to={repo.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate hover:text-gray-600 dark:hover:text-gray-300 transition-colors block"
-                >
-                  {repo.url}
-                </Link>
+                <ToolTip variant="accent" className="font-mono text-xs" title={repo.url}>
+                  <Link
+                    to={repo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate hover:text-gray-600 dark:hover:text-gray-300 transition-colors block"
+                  >
+                    {repo.url}
+                  </Link>
+                </ToolTip>
               </div>
               {repo.connected == 0 ? (
                 <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300">

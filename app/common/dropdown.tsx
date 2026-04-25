@@ -12,7 +12,7 @@ type TDropDownActions = {
 
 type TDropdownProps = {
   title: ReactNode;
-  actions: TDropDownActions[];
+  actions: (TDropDownActions | undefined | false | null)[];
 };
 
 export function Dropdown({ title, actions }: TDropdownProps) {
@@ -45,13 +45,25 @@ export function Dropdown({ title, actions }: TDropdownProps) {
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, actions.length - 1));
+
+      for (let i = activeIndex + 1; i < actions.length; i++) {
+        if (actions[i]) {
+          setActiveIndex(i);
+          break;
+        }
+      }
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActiveIndex((i) => Math.max(i - 1, -1));
+
+      for (let i = activeIndex - 1; i >= -1; i--) {
+        if (i == -1 || actions[i]) {
+          setActiveIndex(i);
+          break;
+        }
+      }
     } else if (e.key === "Enter" && activeIndex >= 0) {
       e.preventDefault();
-      if (!actions[activeIndex].disabled) {
+      if (actions[activeIndex] && !actions[activeIndex].disabled) {
         handleSelect(actions[activeIndex]);
       }
     } else if (e.key === "Escape") {
@@ -83,13 +95,14 @@ export function Dropdown({ title, actions }: TDropdownProps) {
       {open && (
         <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[10rem] rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
           {actions.map((action, i) => {
-            const active = activeIndex == i;
+            if (!action) return null;
+            const active = activeIndex === i;
             const disabled = action.disabled === true;
 
             return (
               <div
                 key={i}
-                className={`border-2 rounded ${active ? "border-gray-500" : "border-gray-800"} ${disabled ? "opacity-25" : ""}`}
+                className={`border-2 rounded overflow-hidden transition ease-in ${active ? "border-gray-500" : "border-transparent"} ${disabled ? "opacity-25" : ""}`}
                 onClick={() => handleSelect(action)}
               >
                 {action.render({ active, close, disabled })}
