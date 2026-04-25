@@ -196,5 +196,4 @@ serve({ fetch: app.fetch, port: 3000 }, (opt) => {
   console.log(`Started listening on port Port :${opt.port}`);
 });
 
-export default app;
 export type AppType = typeof routes;

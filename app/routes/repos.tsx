@@ -278,6 +278,7 @@ export default function ReposPage() {
               <Dropdown
                 actions={[
                   {
+                    disabled: repo.connected == 1,
                     render: () => (
                       <button
                         disabled={repoRetryMut.isPending}

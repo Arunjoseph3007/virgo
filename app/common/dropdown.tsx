@@ -51,7 +51,9 @@ export function Dropdown({ title, actions }: TDropdownProps) {
       setActiveIndex((i) => Math.max(i - 1, -1));
     } else if (e.key === "Enter" && activeIndex >= 0) {
       e.preventDefault();
-      handleSelect(actions[activeIndex]);
+      if (!actions[activeIndex].disabled) {
+        handleSelect(actions[activeIndex]);
+      }
     } else if (e.key === "Escape") {
       close();
     }
@@ -80,20 +82,20 @@ export function Dropdown({ title, actions }: TDropdownProps) {
 
       {open && (
         <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[10rem] rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
-          {actions.map((action, i) => (
-            <div
-              key={i}
-              className={`border-2 rounded ${activeIndex == i ? "border-gray-500" : "border-gray-800"}`}
-              onClick={() => handleSelect(action)}
-            >
-              {action.render({
-                active: activeIndex == i,
-                close,
-                disabled:
-                  action.disabled == true || action.disabled == undefined,
-              })}
-            </div>
-          ))}
+          {actions.map((action, i) => {
+            const active = activeIndex == i;
+            const disabled = action.disabled === true;
+
+            return (
+              <div
+                key={i}
+                className={`border-2 rounded ${active ? "border-gray-500" : "border-gray-800"} ${disabled ? "opacity-25" : ""}`}
+                onClick={() => handleSelect(action)}
+              >
+                {action.render({ active, close, disabled })}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
