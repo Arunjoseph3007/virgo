@@ -50,9 +50,7 @@ const routes = new Hono()
       limit: 20,
       where: and(
         or(like(repos.name, search), like(repos.url, search)),
-        query.connected
-          ? eq(repos.connected, Number(query.connected == "true"))
-          : undefined
+        query.connected ? eq(repos.connected, query.connected) : undefined
       ),
     });
 

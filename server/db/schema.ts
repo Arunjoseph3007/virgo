@@ -1,4 +1,4 @@
-import { relations, type InferSelectModel } from "drizzle-orm";
+import { relations, sql, type InferSelectModel } from "drizzle-orm";
 import {
   foreignKey,
   int,
@@ -7,6 +7,16 @@ import {
   text,
   unique,
 } from "drizzle-orm/sqlite-core";
+
+const now = () => sql`(CURRENT_TIMESTAMP)`;
+
+const timestampFeilds = {
+  createdAt: text().notNull().default(now()),
+  updatedAt: text()
+    .notNull()
+    .default(now())
+    .$onUpdate(() => now()),
+} as const;
 
 export const users = sqliteTable("users", {
   id: int().primaryKey({ autoIncrement: true }),
@@ -19,8 +29,8 @@ export const repos = sqliteTable("repos", {
   id: int().primaryKey({ autoIncrement: true }),
   name: text().notNull(),
   url: text().notNull(),
-  connected: int({ mode: "number" }).default(0),
-}); 
+  connected: int({ mode: "boolean" }).default(false),
+});
 
 export const projects = sqliteTable("projects", {
   name: text({ length: 20 }).primaryKey(),
@@ -52,6 +62,33 @@ export const workspaces = sqliteTable(
     primaryKey({ columns: [table.name, table.projectName] }),
   ]
 );
+
+export type THistroyVarInfo = {
+  vars: Record<string, string>;
+  varFile: string[];
+};
+
+export const history = sqliteTable("history", {
+  id: int().primaryKey({ autoIncrement: true }),
+  workspaceName: text({ length: 20 })
+    .notNull()
+    .references(() => workspaces.name, { onDelete: "cascade" }),
+  projectName: text({ length: 20 })
+    .notNull()
+    .references(() => workspaces.projectName, { onDelete: "cascade" }),
+  varInfo: text({ mode: "json" })
+    .$type<THistroyVarInfo>()
+    .notNull()
+    .default({ vars: {}, varFile: [] }),
+
+  // git revision info
+  repoUrl: text().notNull(),
+  revision: text({ length: 40 }).notNull(),
+  author: text().notNull(),
+  comment: text(),
+
+  ...timestampFeilds,
+});
 
 export const PARAM_TYPES = ["var", "var-file"] as const;
 
@@ -90,6 +127,7 @@ export const workspaceRelations = relations(workspaces, ({ one, many }) => ({
     references: [projects.name],
   }),
   params: many(params),
+  histroy: many(history),
 }));
 
 export const paramRelations = relations(params, ({ one }) => ({
@@ -99,10 +137,18 @@ export const paramRelations = relations(params, ({ one }) => ({
   }),
 }));
 
+export const historyRelation = relations(history, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [history.workspaceName, history.projectName],
+    references: [workspaces.name, workspaces.projectName],
+  }),
+}));
+
 export type TUser = InferSelectModel<typeof users>;
 export type TProject = InferSelectModel<typeof projects>;
 export type TRepo = InferSelectModel<typeof repos>;
 export type TWorkspace = InferSelectModel<typeof workspaces>;
 export type TParam = InferSelectModel<typeof params>;
+export type THistory = InferSelectModel<typeof history>;
 export type TParamType = (typeof PARAM_TYPES)[number];
 export type TWSHealthStatus = (typeof WS_STATES)[number];

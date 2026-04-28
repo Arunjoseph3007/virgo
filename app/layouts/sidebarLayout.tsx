@@ -1,12 +1,12 @@
 import { NavLink, Outlet } from "react-router";
 import logoSrc from "../../public/favicon.ico";
 import { useState } from "react";
-import { ProjectsIcon, ReposIcon } from "~/common/icons";
-
+import { PlusIcon, ProjectsIcon, ReposIcon } from "~/common/icons";
 
 const NAV_ITEMS = [
   { to: "/repos", label: "Repos", Icon: ReposIcon },
   { to: "/projects", label: "Projects", Icon: ProjectsIcon },
+  { to: "/projects/new", label: "New Project", Icon: PlusIcon },
 ];
 
 export default function SidebarLayout() {

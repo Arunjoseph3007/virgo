@@ -2,7 +2,13 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
 import { Dropdown } from "~/common/dropdown";
-import type { ResourceChange, TerraformPlanData } from "~/types/planData";
+import {
+  ChangeType,
+  type JsonValue,
+  type OutputChange,
+  type ResourceChange,
+  type TerraformPlanData,
+} from "~/types/planData";
 import { client } from "~/client";
 import {
   CloseIcon,
@@ -17,20 +23,13 @@ import { SidePanel } from "~/common/sidePanel";
 import type { TParam, TWorkspace } from "../../server/db/schema";
 import { useImmer } from "use-immer";
 import { TextInput } from "~/common/input";
+import { ACTION_ICONS, getDiffSymbol } from "~/components/tfUtils";
 
 export function meta({}) {
   return [
     { title: "Terraform Plan Viewer" },
     { name: "description", content: "Terraform plan resource changes" },
   ];
-}
-
-enum ChangeType {
-  Create = "create",
-  Delete = "delete",
-  Update = "update",
-  Replace = "replace",
-  Noop = "no-op",
 }
 
 const ACTION_STYLES: Record<ChangeType, string> = {
@@ -43,22 +42,8 @@ const ACTION_STYLES: Record<ChangeType, string> = {
   "no-op": "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
 };
 
-const ACTION_ICONS: Record<ChangeType, string> = {
-  create: "+",
-  delete: "-",
-  update: "~",
-  replace: "±",
-  "no-op": "○",
-};
-
-// type ResourceChange = (typeof defaultPlanData.resource_changes)[number];
-type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [k: string]: JsonValue };
+const isPlainObject = (val: any) =>
+  val !== null && typeof val === "object" && !Array.isArray(val);
 
 function ActionBadge({ action }: { action: ChangeType }) {
   const style = ACTION_STYLES[action] ?? ACTION_STYLES["no-op"];
@@ -75,73 +60,6 @@ function ActionBadge({ action }: { action: ChangeType }) {
 
 function hasMeaningfulChange(change: ResourceChange) {
   return change.change.actions.some((a) => a !== "no-op");
-}
-
-function formatValue(val: JsonValue): string {
-  if (val === null) return "null";
-  if (typeof val === "string") return `"${val}"`;
-  if (typeof val === "boolean") return val ? "true" : "false";
-  if (typeof val === "number") return String(val);
-  if (Array.isArray(val)) {
-    if (val.length === 0) return "[]";
-    return `[${val.map(formatValue).join(", ")}]`;
-  }
-  return JSON.stringify(val);
-}
-
-function isSkippableValue(val: JsonValue): boolean {
-  if (val === null) return true;
-  if (val === "") return true;
-  if (Array.isArray(val) && val.length === 0) return true;
-  return false;
-}
-
-const isPlainObject = (val: any) =>
-  val !== null && typeof val === "object" && !Array.isArray(val);
-
-function stringifyExpr(val: JsonValue, level = 1): string {
-  if (val === null) return "null";
-  if (typeof val === "string") return `"${val}"`;
-  if (typeof val === "boolean") return val ? "true" : "false";
-  if (typeof val === "number") return `${val}`;
-
-  const indent = "  ".repeat(level);
-  if (Array.isArray(val)) {
-    if (val.length === 0) return "[]";
-
-    let str = "[\n";
-
-    val.forEach((ent) => {
-      str += indent + stringifyExpr(ent, level + 1) + ",\n";
-    });
-    str += indent.slice(0, -2) + "]";
-    return str;
-  }
-
-  // object
-  if (Object.keys(val).length == 0) return "{}";
-  let str = "{\n";
-
-  for (const key in val) {
-    if (
-      Array.isArray(val[key]) &&
-      val[key].length > 0 &&
-      isPlainObject(val[key][0])
-    ) {
-      val[key].forEach((ent) => {
-        str += indent + key + " " + stringifyExpr(ent, level + 1) + "\n";
-      });
-    } else if (isPlainObject(val[key])) {
-      str += `${indent}${key} ${stringifyExpr(val[key], level + 1)}\n`;
-    } else {
-      str += `${indent}${key} = ${stringifyExpr(val[key], level + 1)}\n`;
-    }
-  }
-  return str + indent.slice(0, -2) + "}";
-}
-
-function jsonToTf(name: string, type: string, data: JsonValue): string {
-  return `resource "${type}" "${name}" ` + stringifyExpr(data);
 }
 
 /** HCL-style resource block rendered from resource info */
@@ -161,14 +79,6 @@ function ResourceInfo({
       <span className={HIGHLIGHT.string}>"{type}"</span> {renderExprNode(data)}
     </pre>
   );
-}
-
-function getDiffSymbol(before: any, after: any): string {
-  if (!before) return ACTION_ICONS[ChangeType.Create];
-  if (!after) return ACTION_ICONS[ChangeType.Delete];
-  if (JSON.stringify(before) == JSON.stringify(after))
-    return ACTION_ICONS[ChangeType.Noop];
-  return ACTION_ICONS[ChangeType.Update];
 }
 
 // Rosé Pine theme — https://rosepinetheme.com/palette
@@ -441,102 +351,6 @@ function renderDiffNode(
   return <span className="text-red-500">ERROR</span>;
 }
 
-function stringifyDiff(before: JsonValue, after: JsonValue, level = 0): string {
-  const indent = "    ".repeat(level);
-  const sindent = "    ".repeat(level - 1);
-
-  // all primitives
-  if (
-    typeof before == "string" ||
-    typeof after == "string" ||
-    typeof before == "number" ||
-    typeof after == "number" ||
-    typeof before == "boolean" ||
-    typeof after == "boolean"
-  ) {
-    // no diff
-    if (JSON.stringify(before) == JSON.stringify(after))
-      return stringifyExpr(before, level);
-
-    return `${stringifyExpr(before, level)} -> ${stringifyExpr(after, level)}`;
-  }
-
-  // primitive array
-  if (Array.isArray(before) || Array.isArray(after)) {
-    before = (before || []) as any[];
-    after = (after || []) as any[];
-
-    const max = Math.max(before.length, after.length);
-    if (max == 0) return "[]";
-    let str = "[\n";
-    for (let i = 0; i < max; i++) {
-      str += indent;
-      str += getDiffSymbol(before.at(i) ?? null, after.at(i) ?? null);
-      str += " ";
-      str += stringifyDiff(
-        before.at(i) ?? null,
-        after.at(i) ?? null,
-        level + 1
-      );
-      str += ",\n";
-    }
-    return str + sindent + "]\n";
-  }
-
-  // objects
-  if (isPlainObject(before) || isPlainObject(after)) {
-    const keysSet = new Set<string>();
-    for (const key in before) keysSet.add(key);
-    for (const key in after) keysSet.add(key);
-
-    if (keysSet.size == 0) return "{}";
-
-    let str = "{\n";
-    for (const key of keysSet) {
-      const bVal = before && (before[key] ?? null);
-      const aVal = after && (after[key] ?? null);
-
-      if (
-        Array.isArray(bVal) &&
-        bVal.length > 0 &&
-        isPlainObject(bVal[0]) &&
-        Array.isArray(aVal) &&
-        aVal.length > 0 &&
-        isPlainObject(aVal[0])
-      ) {
-        const maxn = Math.max(bVal.length, aVal.length);
-
-        for (let i = 0; i < maxn; i++) {
-          str += indent;
-          str += getDiffSymbol(bVal.at(i) ?? null, aVal.at(i) ?? null);
-          str += " " + key + " ";
-          str += stringifyDiff(
-            bVal.at(i) ?? null,
-            aVal.at(i) ?? null,
-            level + 1
-          );
-          str += "\n";
-        }
-      } else if (isPlainObject(bVal) || isPlainObject(aVal)) {
-        str += indent;
-        str += getDiffSymbol(bVal, aVal);
-        str += " " + key + " ";
-        str += stringifyDiff(bVal, aVal, level + 1);
-        str += "\n";
-      } else {
-        str += indent;
-        str += getDiffSymbol(bVal, aVal);
-        str += " " + key + " = ";
-        str += stringifyDiff(bVal, aVal, level + 1);
-        str += "\n";
-      }
-    }
-    return str + sindent + "}";
-  }
-
-  return "SOMETHING WENT WRONG";
-}
-
 function DiffView({
   name,
   type,
@@ -561,6 +375,68 @@ function DiffView({
       <span className={HIGHLIGHT.string}>"{type}"</span>{" "}
       {renderDiffNode(before, after, 2, afterUnknown)}
     </pre>
+  );
+}
+
+function OutputCard({ name, output }: { name: string; output: OutputChange }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="rounded-xl border bg-white dark:bg-gray-900 shadow-sm transition-shadow hover:shadow-md border-gray-100 dark:border-gray-800">
+      {/* Card header — clickable */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full text-left px-5 py-4 flex items-start justify-between gap-4 cursor-pointer"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-mono text-gray-500 dark:text-gray-400 truncate">
+            output
+          </p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-600 font-mono truncate">
+            {name}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <div className="flex flex-wrap gap-1.5">
+            {output.actions.map((action) => (
+              <ActionBadge key={action} action={action as ChangeType} />
+            ))}
+          </div>
+          <svg
+            className={`h-4 w-4 text-gray-400 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </div>
+      </button>
+
+      {/* Accordion body */}
+      {open && (
+        <div className="px-5 pb-5 border-t border-gray-100 dark:border-gray-800 pt-4">
+          <pre className="rounded-lg bg-gray-950 text-gray-200 text-xs font-mono p-4 overflow-x-auto whitespace-pre leading-relaxed">
+            <DiffSym sym={ACTION_ICONS[output.actions[0]]} />
+            {" output "}
+            <span className={HIGHLIGHT.string}>"{name}"</span>{" "}
+            <span className={HIGHLIGHT.string}>=</span>{" "}
+            {renderDiffNode(
+              output.before as JsonValue,
+              output.after as JsonValue,
+              2,
+              output.after_unknown
+            )}
+          </pre>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1151,6 +1027,16 @@ export default function PlanInfoPage() {
           </div>
         </div>
 
+        {/* Edit Panel */}
+        {wsInfoQuery.data && (
+          <EditPanel
+            open={editDialogOpen}
+            setOpen={setEditDialogOpen}
+            params={wsInfoQuery.data.params}
+            workspaceInfo={wsInfoQuery.data.workspaceInfo}
+          />
+        )}
+
         {/* Summary bar */}
         <div className="mb-6 flex flex-wrap gap-3">
           {summary.create > 0 && (
@@ -1195,16 +1081,6 @@ export default function PlanInfoPage() {
           )}
         </div>
 
-        {/* Edit Panel */}
-        {wsInfoQuery.data && (
-          <EditPanel
-            open={editDialogOpen}
-            setOpen={setEditDialogOpen}
-            params={wsInfoQuery.data.params}
-            workspaceInfo={wsInfoQuery.data.workspaceInfo}
-          />
-        )}
-
         {/* Resource cards */}
         <div className="space-y-3">
           {changes.map((change) => (
@@ -1214,6 +1090,7 @@ export default function PlanInfoPage() {
 
         <hr className="my-4 border-gray-700" />
 
+        {/* Drift Summary */}
         {driftDetected ? (
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
@@ -1275,6 +1152,18 @@ export default function PlanInfoPage() {
           {drifts.map((drift) => (
             <ResourceCard key={drift.address} change={drift} />
           ))}
+        </div>
+
+        <hr className="my-4 border-gray-700" />
+
+        {/* Data Cards */}
+        <div className="space-y-3">
+          {planDataQuery.data &&
+            Object.entries(planDataQuery.data.output_changes).map(
+              ([key, output]) => (
+                <OutputCard key={key} name={key} output={output} />
+              )
+            )}
         </div>
       </div>
     </div>

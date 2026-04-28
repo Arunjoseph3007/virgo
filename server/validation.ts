@@ -14,7 +14,7 @@ export const RepoUpdateSchema = RepoInsertSchema;
 
 export const RepoSearchSchema = z.object({
   search: z.string().optional(),
-  connected: z.enum(["true", "false"]).optional(),
+  connected: z.coerce.boolean().optional(),
 });
 
 export const ProjectInsertSchema = z.object({

@@ -1,4 +1,21 @@
+// type ResourceChange = (typeof defaultPlanData.resource_changes)[number];
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [k: string]: JsonValue };
+
 export type ChangeAction = "no-op" | "create" | "delete" | "update" | "replace";
+
+export enum ChangeType {
+  Create = "create",
+  Delete = "delete",
+  Update = "update",
+  Replace = "replace",
+  Noop = "no-op",
+}
 
 export interface PlannedOutput {
   sensitive: boolean;

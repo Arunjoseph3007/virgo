@@ -92,13 +92,13 @@ export class Repo {
     if (res.success) {
       await db
         .update(repos)
-        .set({ connected: 1 })
+        .set({ connected: true })
         .where(eq(repos.id, this.repoId));
       return { success: true, error: null };
     } else {
       await db
         .update(repos)
-        .set({ connected: 0 })
+        .set({ connected: false })
         .where(eq(repos.id, this.repoId));
       return { success: false, error: res.stderr };
     }

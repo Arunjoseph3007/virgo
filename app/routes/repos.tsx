@@ -255,33 +255,37 @@ export default function ReposPage() {
                 <p className="font-semibold text-gray-900 dark:text-white truncate">
                   {repo.name}
                 </p>
-                <ToolTip variant="accent" className="font-mono text-xs" title={repo.url}>
+                <ToolTip
+                  variant="accent"
+                  className="font-mono text-xs"
+                  title={repo.url.slice(0,4)}
+                >
                   <Link
                     to={repo.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate hover:text-gray-600 dark:hover:text-gray-300 transition-colors block"
+                    className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                   >
                     {repo.url}
                   </Link>
                 </ToolTip>
               </div>
-              {repo.connected == 0 ? (
-                <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300">
-                  <span className="size-1.5 rounded-full bg-red-500 dark:bg-red-400" />
-                  Failed
-                </span>
-              ) : (
+              {repo.connected ? (
                 <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300">
                   <span className="size-1.5 rounded-full bg-green-500 dark:bg-green-400" />
                   Connected
+                </span>
+              ) : (
+                <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300">
+                  <span className="size-1.5 rounded-full bg-red-500 dark:bg-red-400" />
+                  Failed
                 </span>
               )}
 
               <Dropdown
                 actions={[
                   {
-                    disabled: repo.connected == 1,
+                    disabled: repo.connected ?? false,
                     render: () => (
                       <button
                         disabled={repoRetryMut.isPending}
