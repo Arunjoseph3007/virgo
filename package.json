@@ -3,14 +3,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "react-router build",
-    "dev": "react-router dev",
-    "start": "react-router-serve ./build/server/index.js",
-    "server": "tsx watch server/server.ts",
-    "typecheck": "react-router typegen && tsc",
-    "make-migrations": "drizzle-kit generate",
-    "migrate": "drizzle-kit migrate",
-    "studio": "drizzle-kit studio"
+    "frontend:typecheck": "react-router typegen && tsc",
+    "frontend:build": "react-router build",
+    "frontend:dev": "react-router dev",
+    "frontend:start": "react-router-serve ./build/server/index.js",
+
+    "backend:dev": "tsx watch server/server.ts",
+    "backend:start": "tsx server/server.ts",
+    
+    "db": "drizzle-kit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.13",
