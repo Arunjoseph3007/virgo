@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { TextInput } from "./input";
+import { useQuery } from "@tanstack/react-query";
+import useDebounce from "~/hooks/useDebounce";
 
 type TTextInputProps<T> = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
@@ -23,26 +25,15 @@ export function AutoComplete<T>({
 }: TTextInputProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [val, setVal] = useState("");
-  const [suggs, setSuggs] = useState<T[]>([]);
+  const debVal = useDebounce(val);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Debounced fetch — only runs while open
-  useEffect(() => {
-    if (!isOpen) return;
-    setIsLoading(true);
-
-    const timer = setTimeout(() => {
-      getSuggestions(val)
-        .then((results) => {
-          setSuggs(results);
-          setActiveIndex(-1);
-        })
-        .finally(() => setIsLoading(false));
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [val, isOpen, getSuggestions]);
+  const suggsQuery = useQuery({
+    queryKey: ["suggs-query", label, debVal],
+    queryFn: () => getSuggestions(val),
+    enabled: isOpen,
+    initialData: [],
+  });
 
   // Close on outside click
   useEffect(() => {
@@ -58,7 +49,6 @@ export function AutoComplete<T>({
   function handleSelect(item: T) {
     onSelect(item);
     setIsOpen(false);
-    setSuggs([]);
     setVal("");
   }
 
@@ -66,19 +56,20 @@ export function AutoComplete<T>({
     if (!isOpen) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, suggs.length - 1));
+      setActiveIndex((i) => Math.min(i + 1, suggsQuery.data.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActiveIndex((i) => Math.max(i - 1, -1));
     } else if (e.key === "Enter" && activeIndex >= 0) {
       e.preventDefault();
-      handleSelect(suggs[activeIndex]);
+      handleSelect(suggsQuery.data[activeIndex]);
     } else if (e.key === "Escape") {
       setIsOpen(false);
     }
   }
 
-  const showDropdown = isOpen && (isLoading || suggs.length > 0);
+  const showDropdown =
+    isOpen && (suggsQuery.isLoading || suggsQuery.data.length > 0);
 
   return (
     <div className="relative space-y-1" ref={containerRef}>
@@ -93,10 +84,10 @@ export function AutoComplete<T>({
       />
       {showDropdown && (
         <div className="absolute right-0 left-0 top-full z-10 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg">
-          {isLoading ? (
+          {suggsQuery.isLoading ? (
             <div className="px-3 py-2 text-sm text-gray-400">Loading…</div>
           ) : (
-            suggs.map((s, i) => (
+            suggsQuery.data.map((s, i) => (
               <div
                 key={getKey ? getKey(s) : i}
                 // onMouseDown prevents the input blur from firing before onClick
