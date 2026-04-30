@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { client } from "~/client";
@@ -6,6 +6,7 @@ import { useImmer } from "use-immer";
 import { CloseIcon, PlusIcon } from "~/common/icons";
 import { TextInput } from "~/common/input";
 import type { TParamInsert } from "../../server/validation";
+import { AutoComplete } from "~/common/autocomplete";
 
 export function meta() {
   return [
@@ -27,6 +28,14 @@ export default function NewWorkspacePage() {
   const [newVarFile, setNewVarFile] = useState("");
   const [newVarKey, setNewVarKey] = useState("");
   const [newVarVal, setNewVarVal] = useState("");
+
+  const projInfo = useQuery({
+    queryKey: ["proj-info", project],
+    queryFn: async () => {
+      const res = await client.project[":project"].$get({ param: { project } });
+      return await res.json();
+    },
+  });
 
   const addWsMut = useMutation({
     mutationKey: ["add-workspace", project],
@@ -50,6 +59,16 @@ export default function NewWorkspacePage() {
       navigate(`/projects/${project}/${d.workspace.name}`);
     },
   });
+
+  const getVarFileSuggs = async (v: string) => {
+    if (!projInfo.data) return [];
+
+    const res = await client.repos[":repoId"]["var-files"].$get({
+      param: { repoId: projInfo.data.repoId.toString() },
+      query: { search: v },
+    });
+    return await res.json();
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 px-4 py-10">
@@ -111,10 +130,22 @@ export default function NewWorkspacePage() {
           ))}
 
           <div className="flex items-center gap-2">
-            <TextInput
-              value={newVarFile}
-              setValue={setNewVarFile}
-              placeholder="filename.tfvars"
+            <AutoComplete
+              onChange={(e) => setNewVarFile(e.target.value)}
+              getSuggestions={getVarFileSuggs}
+              renderSuggestion={({ val, active }) => (
+                <div
+                  className={`py-1 px-2 text-md border-y border-gray-800 ${active ? "bg-orange-900" : "bg-gray-900"}`}
+                  key={val}
+                >
+                  {val}
+                </div>
+              )}
+              onSelect={(v) =>
+                setVarFiles((vfs) => {
+                  vfs.push(v);
+                })
+              }
             />
             <button
               onClick={() => {

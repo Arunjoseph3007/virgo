@@ -5,7 +5,7 @@ import useDebounce from "~/hooks/useDebounce";
 
 type TTextInputProps<T> = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
-  "type" | "value" | "onChange" | "onSelect"
+  "type" | "value" | "onSelect"
 > & {
   label?: string;
   getSuggestions: (val: string) => Promise<T[]>;
@@ -21,6 +21,7 @@ export function AutoComplete<T>({
   renderSuggestion,
   onSelect,
   getKey,
+  onChange,
   ...props
 }: TTextInputProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -30,7 +31,7 @@ export function AutoComplete<T>({
   const [activeIndex, setActiveIndex] = useState(-1);
   const suggsQuery = useQuery({
     queryKey: ["suggs-query", label, debVal],
-    queryFn: () => getSuggestions(val),
+    queryFn: () => getSuggestions(debVal),
     enabled: isOpen,
     initialData: [],
   });
@@ -77,7 +78,11 @@ export function AutoComplete<T>({
       <TextInput
         label={label}
         value={val}
-        setValue={setVal}
+        onChange={(e) => {
+          setIsOpen(true)
+          setVal(e.target.value);
+          onChange?.(e);
+        }}
         onFocus={() => setIsOpen(true)}
         onKeyDown={handleKeyDown}
         className={className}

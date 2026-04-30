@@ -1,6 +1,10 @@
 import z from "zod";
 import { PARAM_TYPES } from "./db/schema";
 
+export const SearchSchema = z.object({
+  search: z.string().optional(),
+});
+
 export const ApplyConfigSchema = z.object({
   target: z.array(z.string()).optional(),
 });
@@ -12,8 +16,7 @@ export const RepoInsertSchema = z.object({
 
 export const RepoUpdateSchema = RepoInsertSchema;
 
-export const RepoSearchSchema = z.object({
-  search: z.string().optional(),
+export const RepoSearchSchema = SearchSchema.extend({
   connected: z.coerce.boolean().optional(),
 });
 
@@ -35,6 +38,10 @@ export const WorkspaceInsertSchema = z.object({
   name: z.string(),
   gitTarget: z.string(),
   params: z.array(ParamInsertSchema),
+});
+
+export const WorkspaceRollbackSchema = z.object({
+  historyId: z.int(),
 });
 
 export const WorkspaceUpdateSchema = z.object({

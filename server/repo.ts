@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import fsPromises from "fs/promises";
 import child_process from "child_process";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
@@ -108,6 +109,24 @@ export class Repo {
     if (!this.repoInfo) this.throwNoInitErr();
 
     todo("Repo.update this should fetch latest changes for the right branches");
+  }
+
+  async listVarFiles(search: string | undefined) {
+    search ??= "";
+    const pattern = path.join(this.repoPath, `*${search}*.tfvars`);
+
+    const results: string[] = [];
+    for await (const entry of fsPromises.glob(pattern, {
+      withFileTypes: true,
+    })) {
+      if (results.length > 100) break;
+
+      if (!entry.isFile()) continue;
+
+      results.push(entry.name);
+    }
+
+    return results;
   }
 
   async deleteAndCleanup() {

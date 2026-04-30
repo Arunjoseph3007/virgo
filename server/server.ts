@@ -15,10 +15,13 @@ import {
   RepoInsertSchema,
   RepoSearchSchema,
   RepoUpdateSchema,
+  SearchSchema,
   WorkspaceInsertSchema,
+  WorkspaceRollbackSchema,
   WorkspaceUpdateSchema,
 } from "./validation";
 import { and, desc, eq, like, or } from "drizzle-orm";
+import { todo } from "./utils";
 
 const routes = new Hono()
 
@@ -72,6 +75,19 @@ const routes = new Hono()
 
     return c.json({ success: true });
   })
+  .get(
+    "/repos/:repoId/var-files",
+    zValidator("query", SearchSchema),
+    async (c) => {
+      const { search } = c.req.valid("query");
+      const repoId = parseInt(c.req.param("repoId"));
+
+      const repo = await Repo.init(repoId);
+      const results = await repo.listVarFiles(search);
+
+      return c.json(results);
+    }
+  )
 
   .post("/project", zValidator("json", ProjectInsertSchema), async (c) => {
     const proj = await c.req.json();
@@ -88,6 +104,16 @@ const routes = new Hono()
       limit: 20,
     });
     return c.json(projs);
+  })
+  .get("/project/:project", async (c) => {
+    const { project } = c.req.param();
+    const ret = await db.query.projects.findFirst({
+      where: eq(projects.name, project),
+    });
+
+    if (!ret) throw new HTTPException(404);
+
+    return c.json(ret);
   })
   .post(
     "/project/:project/workspaces",
@@ -154,6 +180,31 @@ const routes = new Hono()
     if (!logs) return c.json({ logs: null });
     return c.json({ logs });
   })
+  .post(
+    "/project/:project/:workspace/rollback",
+    zValidator("json", WorkspaceRollbackSchema),
+    async (c) => {
+      const { project, workspace } = c.req.param();
+      const { historyId } = c.req.valid("json");
+
+      const historyRec = await db.query.history.findFirst({
+        where: eq(history.id, historyId),
+      });
+
+      if (!historyRec) return c.notFound();
+      if (
+        historyRec.projectName != project ||
+        historyRec.workspaceName != workspace
+      ) {
+        throw new HTTPException(400, {
+          message:
+            "The history record does not belong to the right project/workspace",
+        });
+      }
+
+      todo("rollback not implemented");
+    }
+  )
   .get("/project/:project/:workspace/history", async (c) => {
     const { project, workspace } = c.req.param();
 
