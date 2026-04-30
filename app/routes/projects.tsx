@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { client } from "~/client";
 import type { WS_STATES } from "../../server/db/schema";
 import { PlusIcon } from "~/common/icons";
+import { type InferResponseType } from "hono/client";
 
 type WsHealth = (typeof WS_STATES)[number];
 
@@ -32,9 +33,7 @@ function HealthBadge({ health }: { health: WsHealth }) {
   );
 }
 
-type Project = Awaited<
-  ReturnType<Awaited<ReturnType<typeof client.project.$get>>["json"]>
->[number];
+type Project = InferResponseType<typeof client.project.$get>[number]
 
 function ProjectCard({ project }: { project: Project }) {
   const hasIssues = project.workspaces.some(
@@ -104,6 +103,13 @@ function ProjectCard({ project }: { project: Project }) {
       </div>
     </div>
   );
+}
+
+export function meta() {
+  return [
+    { title: `Your Projects` },
+    { name: "description", content: "Dashboard to manage virgo projects" },
+  ];
 }
 
 export default function ProjectsPage() {

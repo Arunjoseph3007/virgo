@@ -3,11 +3,14 @@ import path from "path";
 import fs from "fs";
 import type { TerraformPlanData } from "~/types/planData";
 import { db } from "./db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
+  history,
   params,
   projects,
+  repos,
   workspaces,
+  type THistroyVarInfo,
   type TParam,
   type TProject,
   type TWorkspace,
@@ -153,6 +156,63 @@ export class Terraform {
     return await this.exec(`git checkout ${this.workspaceInfo.gitTarget}`);
   }
 
+  private async pullChanges() {
+    if (!this.workspace || !this.workspaceInfo) this.throwNoInitErr();
+
+    return await this.exec(`git pull`, { throwOnError: false });
+  }
+
+  async commitInfo() {
+    if (!this.workspace || !this.workspaceInfo) this.throwNoInitErr();
+
+    console.log("ehllo");
+
+    const tagRes = await this.exec(`git rev-parse HEAD`);
+    console.log(tagRes);
+    const tag = tagRes.stdout.trim();
+
+    const infoRes = await this.exec(`git show ${tag} --summary`);
+    console.log(infoRes);
+    const [revisionLine, authorLine, _1, _2, commentLine, _3] =
+      infoRes.stdout.split("\n");
+
+    const revision = revisionLine.split(" ")[1];
+    const author = authorLine.split(" ").slice(1).join(" ");
+    const comment = commentLine.trim();
+
+    return { revision, author, comment };
+  }
+
+  private async getRepoUrl() {
+    if (!this.projectInfo) this.throwNoInitErr();
+
+    const res = await db
+      .select({ url: repos.url })
+      .from(repos)
+      .where(eq(repos.id, this.projectInfo.repoId));
+
+    if (res.length == 0)
+      throw new Error(`No repo with id ${this.projectInfo.repoId}`);
+
+    return res[0].url;
+  }
+
+  private getParams(): THistroyVarInfo {
+    if (!this.projectInfo) this.throwNoInitErr();
+
+    const vars: Record<string, string> = {};
+    this.params
+      .filter((p) => p.type == "var")
+      .forEach((v) => {
+        vars[v.key] = v.value!;
+      });
+    const varFiles = this.params
+      .filter((p) => p.type == "var-file")
+      .map((p) => p.key);
+
+    return { varFiles, vars };
+  }
+
   private wsSelector() {
     if (!this.workspace) this.throwNoInitErr();
 
@@ -218,7 +278,13 @@ export class Terraform {
   }
 
   async apply(config: TApplyConfig) {
-    if (!this.projectInfo) this.throwNoInitErr();
+    if (!this.projectInfo || !this.workspaceInfo || !this.workspace)
+      this.throwNoInitErr();
+
+    const status = this.workspaceInfo.health;
+    if (status == "ERROR") {
+      return false;
+    }
 
     const lc = new Lock(this.projectInfo.repoId);
     lc.lock();
@@ -231,6 +297,17 @@ export class Terraform {
     await this.exec(
       `terraform apply ${this.getParamFlags()} ${targetFlags} -input=false ${this.planCacheFile}`
     );
+
+    // creating history record
+    const commitInfo = await this.commitInfo();
+
+    await db.insert(history).values({
+      ...commitInfo,
+      projectName: this.project,
+      repoUrl: await this.getRepoUrl(),
+      workspaceName: this.workspace,
+      varInfo: this.getParams(),
+    });
 
     lc.release();
 
@@ -247,6 +324,7 @@ export class Terraform {
     lc.lock();
 
     await this.revCheckout();
+    await this.pullChanges();
     await this.selectWS(this.workspace);
 
     if (!fs.existsSync(this.repoPath)) return false;

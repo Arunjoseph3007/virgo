@@ -65,30 +65,34 @@ export const workspaces = sqliteTable(
 
 export type THistroyVarInfo = {
   vars: Record<string, string>;
-  varFile: string[];
+  varFiles: string[];
 };
 
-export const history = sqliteTable("history", {
-  id: int().primaryKey({ autoIncrement: true }),
-  workspaceName: text({ length: 20 })
-    .notNull()
-    .references(() => workspaces.name, { onDelete: "cascade" }),
-  projectName: text({ length: 20 })
-    .notNull()
-    .references(() => workspaces.projectName, { onDelete: "cascade" }),
-  varInfo: text({ mode: "json" })
-    .$type<THistroyVarInfo>()
-    .notNull()
-    .default({ vars: {}, varFile: [] }),
+export const history = sqliteTable(
+  "history",
+  {
+    id: int().primaryKey({ autoIncrement: true }),
+    workspaceName: text({ length: 20 }).notNull(),
+    projectName: text({ length: 20 }).notNull(),
+    varInfo: text({ mode: "json" }).$type<THistroyVarInfo>().notNull(),
 
-  // git revision info
-  repoUrl: text().notNull(),
-  revision: text({ length: 40 }).notNull(),
-  author: text().notNull(),
-  comment: text(),
+    // git revision info
+    repoUrl: text().notNull(),
+    revision: text({ length: 40 }).notNull(),
+    author: text().notNull(),
+    comment: text(),
 
-  ...timestampFeilds,
-});
+    ...timestampFeilds,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectName, table.workspaceName],
+      foreignColumns: [workspaces.projectName, workspaces.name],
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+  ]
+);
 
 export const PARAM_TYPES = ["var", "var-file"] as const;
 

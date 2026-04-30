@@ -42,6 +42,7 @@ export function AutoComplete<T>({
         setIsOpen(false);
       }
     }
+
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, []);

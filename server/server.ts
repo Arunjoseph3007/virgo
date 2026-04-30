@@ -7,7 +7,7 @@ import { zValidator } from "@hono/zod-validator";
 import { serve } from "@hono/node-server";
 import { Terraform } from "./terraform";
 import { db } from "./db";
-import { projects, repos } from "./db/schema";
+import { history, projects, repos } from "./db/schema";
 import { Repo } from "./repo";
 import {
   ApplyConfigSchema,
@@ -18,7 +18,7 @@ import {
   WorkspaceInsertSchema,
   WorkspaceUpdateSchema,
 } from "./validation";
-import { and, eq, like, or } from "drizzle-orm";
+import { and, desc, eq, like, or } from "drizzle-orm";
 
 const routes = new Hono()
 
@@ -135,7 +135,15 @@ const routes = new Hono()
       throw new HTTPException(404, { message: "Workspace Info not found" });
     }
 
-    return c.json({ workspaceInfo, projectInfo, params });
+    const lastApplyInfo = await db.query.history.findFirst({
+      where: and(
+        eq(history.projectName, project),
+        eq(history.workspaceName, workspace)
+      ),
+      orderBy: desc(history.id),
+    });
+
+    return c.json({ workspaceInfo, projectInfo, params, lastApplyInfo });
   })
   .get("/project/:project/:workspace/logs", async (c) => {
     const { project, workspace } = c.req.param();
@@ -145,6 +153,26 @@ const routes = new Hono()
 
     if (!logs) return c.json({ logs: null });
     return c.json({ logs });
+  })
+  .get("/project/:project/:workspace/history", async (c) => {
+    const { project, workspace } = c.req.param();
+
+    const historyRes = await db.query.history.findMany({
+      where: and(
+        eq(history.projectName, project),
+        eq(history.workspaceName, workspace)
+      ),
+    });
+
+    return c.json(historyRes);
+  })
+  .get("/project/:project/:workspace/commitInfo", async (c) => {
+    const { project, workspace } = c.req.param();
+
+    const tf = await Terraform.init(project, workspace);
+    const info = await tf.commitInfo();
+
+    return c.json(info);
   })
   .get("/project/:project/:workspace/refresh", async (c) => {
     const { project, workspace } = c.req.param();

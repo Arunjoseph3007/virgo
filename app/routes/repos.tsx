@@ -12,6 +12,13 @@ import { useImmer } from "use-immer";
 import type { TRepoUpdate } from "../../server/validation";
 import ToolTip from "~/common/tooltip";
 
+export function meta() {
+  return [
+    { title: `Repos` },
+    { name: "description", content: "Manage repositories" },
+  ];
+}
+
 export default function ReposPage() {
   const qc = useQueryClient();
 
@@ -258,7 +265,7 @@ export default function ReposPage() {
                 <ToolTip
                   variant="accent"
                   className="font-mono text-xs"
-                  title={repo.url.slice(0,4)}
+                  title={repo.url.slice(0, 4)}
                 >
                   <Link
                     to={repo.url}

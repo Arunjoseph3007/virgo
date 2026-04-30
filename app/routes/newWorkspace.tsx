@@ -7,6 +7,13 @@ import { CloseIcon, PlusIcon } from "~/common/icons";
 import { TextInput } from "~/common/input";
 import type { TParamInsert } from "../../server/validation";
 
+export function meta() {
+  return [
+    { title: `New Workspace` },
+    { name: "description", content: "Create new Workspace" },
+  ];
+}
+
 export default function NewWorkspacePage() {
   const navigate = useNavigate();
   const param = useParams();

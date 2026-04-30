@@ -7,6 +7,13 @@ import type { TRepo } from "../../server/db/schema";
 import { AutoComplete } from "~/common/autocomplete";
 import { useNavigate } from "react-router";
 
+export function meta() {
+  return [
+    { title: `New Project` },
+    { name: "description", content: "Create new Virgo Project" },
+  ];
+}
+
 export default function NewProjectPage() {
   const [projName, setProjName] = useState("");
   const [folder, setFolder] = useState(".");
@@ -33,6 +40,13 @@ export default function NewProjectPage() {
       navigate("/projects");
     },
   });
+
+  const getRepoSuggestions = async (search: string) => {
+    const res = await client.repos.$get({
+      query: { connected: "true", search },
+    });
+    return await res.json();
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 px-4 py-10">
@@ -77,12 +91,7 @@ export default function NewProjectPage() {
             </div>
           ) : (
             <AutoComplete
-              getSuggestions={async (v) => {
-                const res = await client.repos.$get({
-                  query: { connected: "true", search: v },
-                });
-                return await res.json();
-              }}
+              getSuggestions={getRepoSuggestions}
               renderSuggestion={({ val, active }) => (
                 <div
                   className={`cursor-pointer px-3 py-2 text-sm flex items-center gap-2 ${

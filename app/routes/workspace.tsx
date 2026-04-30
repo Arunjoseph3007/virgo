@@ -17,18 +17,22 @@ import {
   PlusIcon,
 } from "~/common/icons";
 import { Dialog } from "~/common/dialog";
-import { ansiToHtml } from "~/utils/ansi";
+import { AnsiReplacer } from "~/utils/ansi";
 import type { TApplyConfig, TParamUpdate } from "../../server/validation";
 import { SidePanel } from "~/common/sidePanel";
-import type { TParam, TWorkspace } from "../../server/db/schema";
+import type { THistory, TParam, TWorkspace } from "../../server/db/schema";
 import { useImmer } from "use-immer";
 import { TextInput } from "~/common/input";
 import { ACTION_ICONS, getDiffSymbol } from "~/components/tfUtils";
+import type { Route } from "../+types/root";
 
-export function meta({}) {
+export function meta({ params }: Route.MetaArgs) {
   return [
-    { title: "Terraform Plan Viewer" },
-    { name: "description", content: "Terraform plan resource changes" },
+    { title: `Virgo Workspace - ${params.project}/${params.workspace}` },
+    {
+      name: "description",
+      content: "Manage your terraform workspace resources",
+    },
   ];
 }
 
@@ -553,7 +557,7 @@ function PlanLogs({
       <div>
         <pre
           dangerouslySetInnerHTML={{
-            __html: ansiToHtml(logsQuery.data.logs),
+            __html: AnsiReplacer.convert(logsQuery.data.logs),
           }}
           className="rounded-lg bg-gray-950 text-gray-200 text-xs font-mono p-4 overflow-x-auto whitespace-pre max-h-[60vh]"
         />
@@ -764,7 +768,113 @@ function EditPanel({
   );
 }
 
-export default function PlanInfoPage() {
+function LastApplyInfo({ lastApplyInfo }: { lastApplyInfo: THistory }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="border-y border-gray-800 my-2 py-2">
+      <p className="text-sm mb-2 tracking-wide uppercase flex items-center gap-2">
+        Last sync info{" "}
+        <button onClick={() => setIsOpen(true)}>
+          <PlusIcon />
+        </button>
+      </p>
+
+      <SidePanel
+        open={isOpen}
+        onClose={() => setIsOpen(false)}
+        actions={[{ label: "Close", onClick: () => setIsOpen(false) }]}
+        title="Last Appy Info"
+      >
+        <div className="space-y-1 [&>*]:flex [&>*]:gap-2 text-white">
+          <div>
+            <div className="w-[100px] text-gray-400 font-light text-right">
+              Author
+            </div>
+            <div>{lastApplyInfo.author}</div>
+          </div>
+          <div>
+            <div className="w-[100px] text-gray-400 font-light text-right">
+              Comment
+            </div>
+            <div>{lastApplyInfo.comment}</div>
+          </div>
+          <div>
+            <div className="w-[100px] text-gray-400 font-light text-right">
+              Revision
+            </div>
+            <div>{lastApplyInfo.revision}</div>
+          </div>
+          <div>
+            <div className="w-[100px] text-gray-400 font-light text-right">
+              Synced At
+            </div>
+            <div>{lastApplyInfo.createdAt}</div>
+          </div>
+        </div>
+
+        <hr className="my-4 border-gray-700" />
+
+        <div className="space-y-1 [&>*]:flex [&>*]:gap-2 text-white">
+          <h5 className="text-white text-lg font-semibold">Variables</h5>
+
+          {Object.entries(lastApplyInfo.varInfo.vars).length == 0 &&
+            "No Variables"}
+
+          {Object.entries(lastApplyInfo.varInfo.vars).map(([key, value]) => (
+            <div className="font-mono" key={key}>
+              <div className="w-[100px] text-gray-400 font-light text-right">
+                {key}
+              </div>
+              <div>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        <hr className="my-4 border-gray-700" />
+
+        <div className="space-y-1 [&>*]:flex [&>*]:gap-2 text-white">
+          <h5 className="text-white text-lg font-semibold">Variable Files</h5>
+
+          {lastApplyInfo.varInfo.varFiles.length == 0 && "No Variable Files"}
+
+          {lastApplyInfo.varInfo.varFiles.map((v) => (
+            <div className="font-mono pl-12" key={v}>{v}</div>
+          ))}
+        </div>
+      </SidePanel>
+
+      <div className="text-xs space-y-[3px] [&>*]:flex [&>*]:gap-2">
+        <div>
+          <div className="w-[80px] text-gray-400 font-light text-right">
+            Author
+          </div>
+          <div>{lastApplyInfo.author}</div>
+        </div>
+        <div>
+          <div className="w-[80px] text-gray-400 font-light text-right">
+            Comment
+          </div>
+          <div>{lastApplyInfo.comment}</div>
+        </div>
+        <div>
+          <div className="w-[80px] text-gray-400 font-light text-right">
+            Revision
+          </div>
+          <div>{lastApplyInfo.revision}</div>
+        </div>
+        <div>
+          <div className="w-[80px] text-gray-400 font-light text-right">
+            Synced At
+          </div>
+          <div>{lastApplyInfo.createdAt}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function WorkspacePage() {
   const param = useParams();
   const project = param.project!;
   const workspace = param.workspace!;
@@ -795,7 +905,6 @@ export default function PlanInfoPage() {
     },
   });
 
-  // TODO this can be combined to single query in wsInfoQuery
   const workspaceQuery = useQuery({
     initialData: [],
     queryKey: ["workspaces", project],
@@ -871,6 +980,7 @@ export default function PlanInfoPage() {
   };
 
   const wsInfo = wsInfoQuery.data?.workspaceInfo;
+  const lastApplyInfo = wsInfoQuery.data?.lastApplyInfo;
 
   const HEALTH_STYLES: Record<string, string> = {
     SYNC: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 border-green-200 dark:border-green-800",
@@ -952,27 +1062,32 @@ export default function PlanInfoPage() {
                 title={workspace}
               />
               <button
-                className="cursor-pointer border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
-                onClick={() => refreshMut.mutate()}
-                disabled={refreshMut.isPending}
-              >
-                {refreshMut.isPending ? "Refreshing…" : "Refresh"}
-              </button>
-              <button
                 className="cursor-pointer border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-yellow-100 dark:hover:bg-yellow-900 transition-colors"
                 onClick={() => setEditDialogOpen(true)}
               >
                 Edit
               </button>
-              <button
-                className="cursor-pointer border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-green-100 dark:hover:bg-green-900 transition-colors"
-                onClick={() => applyMut.mutate({})}
-                disabled={applyMut.isPending}
-              >
-                {applyMut.isPending ? "Applying…" : "Apply"}
-              </button>
             </div>
           </div>
+
+          <div className="flex gap-2 mt-3">
+            <button
+              className="cursor-pointer border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
+              onClick={() => refreshMut.mutate()}
+              disabled={refreshMut.isPending}
+            >
+              {refreshMut.isPending ? "Refreshing…" : "Refresh"}
+            </button>
+            <button
+              className="cursor-pointer border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-green-100 dark:hover:bg-green-900 transition-colors"
+              onClick={() => applyMut.mutate({})}
+              disabled={applyMut.isPending || wsInfo?.health != "OUT_OF_SYNC"}
+            >
+              {applyMut.isPending ? "Applying…" : "Apply"}
+            </button>
+          </div>
+
+          {lastApplyInfo && <LastApplyInfo lastApplyInfo={lastApplyInfo} />}
 
           {/* Meta row: health + git target + tf version + resource count */}
           <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
@@ -995,7 +1110,7 @@ export default function PlanInfoPage() {
               View logs
             </button>
             <Dialog
-              title={`Plan logs — ${project} / ${workspace}`}
+              title={`Plan logs - ${project} / ${workspace}`}
               open={showLogs}
               onClose={() => setShowLogs(false)}
               actions={[
@@ -1004,7 +1119,6 @@ export default function PlanInfoPage() {
                   onClick() {
                     setShowLogs(false);
                   },
-                  variant: "primary",
                 },
               ]}
             >

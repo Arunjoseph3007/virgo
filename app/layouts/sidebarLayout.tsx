@@ -6,7 +6,7 @@ import { PlusIcon, ProjectsIcon, ReposIcon } from "~/common/icons";
 const NAV_ITEMS = [
   { to: "/repos", label: "Repos", Icon: ReposIcon },
   { to: "/projects", label: "Projects", Icon: ProjectsIcon },
-  { to: "/projects/new", label: "New Project", Icon: PlusIcon },
+  { to: "/new", label: "New Project", Icon: PlusIcon },
 ];
 
 export default function SidebarLayout() {

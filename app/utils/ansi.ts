@@ -1,4 +1,11 @@
-const ANSI_FG: Record<number, string> = {
+const ANSI_STYLES: Record<number, string> = {
+  // decorations
+  1: "font-bold",
+  2: "opacity-60",
+  3: "italic",
+  4: "underline",
+  9: "line-through",
+  // fg colors
   30: "text-gray-400",
   31: "text-red-400",
   32: "text-green-400",
@@ -17,26 +24,51 @@ const ANSI_FG: Record<number, string> = {
   96: "text-cyan-300",
   97: "text-white",
 };
-const ANSI_STYLE: Record<number, string> = {
-  1: "font-bold",
-  2: "opacity-60",
-  3: "italic",
-  4: "underline",
-  9: "line-through",
-};
+
 function escapeHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+export class AnsiReplacer {
+  private openSpans = 0;
+  static RE = /\u001b\[([\d;]*)m/g;
+
+  static convert(html: string) {
+    const ansiRep = new AnsiReplacer();
+    const escpaed = escapeHtml(html);
+    const replacer = ansiRep.replace.bind(ansiRep);
+    return escpaed.replace(AnsiReplacer.RE, replacer);
+  }
+
+  replace(_str: string, raw: string) {
+    // RESET
+    if (raw === "" || raw === "0") {
+      const res = "</span>".repeat(this.openSpans);
+      this.openSpans = 0;
+      return res;
+    }
+
+    const clsStr = raw
+      .split(";")
+      .map(Number)
+      .map((c) => ANSI_STYLES[c])
+      .filter(Boolean)
+      .join(" ");
+
+    this.openSpans++;
+    return `<span class="${clsStr}">`;
+  }
 }
 
 /**
  * Full ANSI-to-HTML converter.
  * Handles compound codes (e.g. ESC[1;31m), all 8+8 fg colors, common styles,
  * and proper reset (closes all open spans on ESC[0m).
- * 
+ *
  * Assumes that user is working with Tailwind CSS
- * 
+ *
  * @str terminal output
- * 
+ *
  * @returns html string
  */
 export function ansiToHtml(str: string): string {
@@ -60,7 +92,7 @@ export function ansiToHtml(str: string): string {
     const clsStr = raw
       .split(";")
       .map(Number)
-      .map((code) => ANSI_FG[code] || ANSI_STYLE[code])
+      .map((code) => ANSI_STYLES[code])
       .filter(Boolean)
       .join(" ");
     result += `<span class="${clsStr}">`;

@@ -6,10 +6,9 @@ import * as schema from "./schema";
 class CustLogger implements Logger {
   logQuery(query: string, params: unknown[]): void {
     console.log(`\x1b[34mQUERY\x1b[0m: ${query}`);
-    if (params.length) {
-      console.log(`\x1b[34mPARAMS\x1b[0m: ${params.length}`);
 
-      params.forEach((p) => console.log("    ", p));
+    if (params.length) {
+      console.log(`\x1b[34mPARAMS\x1b[0m: ${params.length} =>`, params);
     }
   }
 }

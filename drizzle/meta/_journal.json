@@ -36,6 +36,27 @@
       "when": 1776519601355,
       "tag": "0004_known_steel_serpent",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1777386612438,
+      "tag": "0005_whole_morbius",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1777454923070,
+      "tag": "0006_lyrical_outlaw_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1777533512766,
+      "tag": "0007_wooden_echo",
+      "breakpoints": true
     }
   ]
 }
