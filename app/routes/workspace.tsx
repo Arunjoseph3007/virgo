@@ -768,107 +768,120 @@ function EditPanel({
   );
 }
 
+function InfoRow({
+  label,
+  value,
+  labelWidth = "w-[100px]",
+  mono = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  labelWidth?: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className={`flex gap-3 ${mono ? "font-mono" : ""}`}>
+      <div className={`${labelWidth} shrink-0 text-gray-500 text-right`}>
+        {label}
+      </div>
+      <div className="text-gray-200 min-w-0 break-words">{value}</div>
+    </div>
+  );
+}
+
 function LastApplyInfo({ lastApplyInfo }: { lastApplyInfo: THistory }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="border-y border-gray-800 my-2 py-2">
-      <p className="text-sm mb-2 tracking-wide uppercase flex items-center gap-2">
-        Last sync info{" "}
-        <button onClick={() => setIsOpen(true)}>
-          <PlusIcon />
+    <div className="border-y border-gray-800 my-2 py-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold tracking-widest uppercase text-gray-400">
+          Last Sync
+        </p>
+        <button
+          onClick={() => setIsOpen(true)}
+          className="text-xs text-gray-500 hover:text-gray-300 transition-colors underline underline-offset-2"
+        >
+          details
         </button>
-      </p>
+      </div>
 
       <SidePanel
         open={isOpen}
         onClose={() => setIsOpen(false)}
         actions={[{ label: "Close", onClick: () => setIsOpen(false) }]}
-        title="Last Appy Info"
+        title="Last Apply Info"
       >
-        <div className="space-y-1 [&>*]:flex [&>*]:gap-2 text-white">
-          <div>
-            <div className="w-[100px] text-gray-400 font-light text-right">
-              Author
-            </div>
-            <div>{lastApplyInfo.author}</div>
+        <div className="space-y-3 text-sm">
+          <div className="rounded-lg bg-gray-800/50 p-4 space-y-2">
+            <InfoRow label="Author" value={lastApplyInfo.author} />
+            <InfoRow label="Comment" value={lastApplyInfo.comment} />
+            <InfoRow label="Revision" value={lastApplyInfo.revision} />
+            <InfoRow
+              label="Synced At"
+              value={new Date(lastApplyInfo.createdAt).toLocaleString()}
+            />
           </div>
+
           <div>
-            <div className="w-[100px] text-gray-400 font-light text-right">
-              Comment
+            <h5 className="text-xs font-semibold tracking-widest uppercase text-gray-400 mb-2">
+              Variables
+            </h5>
+            <div className="rounded-lg bg-gray-800/50 p-4 space-y-2">
+              {Object.entries(lastApplyInfo.varInfo.vars).length === 0 ? (
+                <p className="text-gray-500 italic text-sm">No variables</p>
+              ) : (
+                Object.entries(lastApplyInfo.varInfo.vars).map(
+                  ([key, value]) => (
+                    <InfoRow key={key} label={key} value={value} mono />
+                  )
+                )
+              )}
             </div>
-            <div>{lastApplyInfo.comment}</div>
           </div>
+
           <div>
-            <div className="w-[100px] text-gray-400 font-light text-right">
-              Revision
+            <h5 className="text-xs font-semibold tracking-widest uppercase text-gray-400 mb-2">
+              Variable Files
+            </h5>
+            <div className="rounded-lg bg-gray-800/50 p-4 space-y-1">
+              {lastApplyInfo.varInfo.varFiles.length === 0 ? (
+                <p className="text-gray-500 italic text-sm">
+                  No variable files
+                </p>
+              ) : (
+                lastApplyInfo.varInfo.varFiles.map((v) => (
+                  <div key={v} className="font-mono text-sm text-gray-300">
+                    {v}
+                  </div>
+                ))
+              )}
             </div>
-            <div>{lastApplyInfo.revision}</div>
           </div>
-          <div>
-            <div className="w-[100px] text-gray-400 font-light text-right">
-              Synced At
-            </div>
-            <div>{lastApplyInfo.createdAt}</div>
-          </div>
-        </div>
-
-        <hr className="my-4 border-gray-700" />
-
-        <div className="space-y-1 [&>*]:flex [&>*]:gap-2 text-white">
-          <h5 className="text-white text-lg font-semibold">Variables</h5>
-
-          {Object.entries(lastApplyInfo.varInfo.vars).length == 0 &&
-            "No Variables"}
-
-          {Object.entries(lastApplyInfo.varInfo.vars).map(([key, value]) => (
-            <div className="font-mono" key={key}>
-              <div className="w-[100px] text-gray-400 font-light text-right">
-                {key}
-              </div>
-              <div>{value}</div>
-            </div>
-          ))}
-        </div>
-
-        <hr className="my-4 border-gray-700" />
-
-        <div className="space-y-1 [&>*]:flex [&>*]:gap-2 text-white">
-          <h5 className="text-white text-lg font-semibold">Variable Files</h5>
-
-          {lastApplyInfo.varInfo.varFiles.length == 0 && "No Variable Files"}
-
-          {lastApplyInfo.varInfo.varFiles.map((v) => (
-            <div className="font-mono pl-12" key={v}>{v}</div>
-          ))}
         </div>
       </SidePanel>
 
-      <div className="text-xs space-y-[3px] [&>*]:flex [&>*]:gap-2">
-        <div>
-          <div className="w-[80px] text-gray-400 font-light text-right">
-            Author
-          </div>
-          <div>{lastApplyInfo.author}</div>
-        </div>
-        <div>
-          <div className="w-[80px] text-gray-400 font-light text-right">
-            Comment
-          </div>
-          <div>{lastApplyInfo.comment}</div>
-        </div>
-        <div>
-          <div className="w-[80px] text-gray-400 font-light text-right">
-            Revision
-          </div>
-          <div>{lastApplyInfo.revision}</div>
-        </div>
-        <div>
-          <div className="w-[80px] text-gray-400 font-light text-right">
-            Synced At
-          </div>
-          <div>{lastApplyInfo.createdAt}</div>
-        </div>
+      <div className="text-xs space-y-1">
+        <InfoRow
+          label="Author"
+          value={lastApplyInfo.author}
+          labelWidth="w-[72px]"
+        />
+        <InfoRow
+          label="Comment"
+          value={lastApplyInfo.comment}
+          labelWidth="w-[72px]"
+        />
+        <InfoRow
+          label="Revision"
+          value={lastApplyInfo.revision}
+          labelWidth="w-[72px]"
+        />
+        <InfoRow
+          label="Synced At"
+          value={new Date(lastApplyInfo.createdAt).toLocaleString()}
+          labelWidth="w-[72px]"
+        />
       </div>
     </div>
   );
